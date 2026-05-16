@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "firm_lens"
+version = "1.0.0"
+description = "Firmware security analysis tool"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Srikanth Rudrarapu" }
+]
+
+dependencies = [
+    "rich",
+    "click",
+    "pycryptodome"
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Security",
+    "Topic :: Software Development :: Embedded Systems",
+    "Topic :: System :: Firmware"
+]
+
+[project.scripts]
+firm-lens = "firm_lens.main:cli"
+
+[tool.setuptools]
+packages = ["firm_lens"]
