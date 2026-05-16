@@ -10,3 +10,6 @@ __pycache__/
 # Ignore Python packaging metadata
 firm_lens.egg-info/
 *.egg-info/
+
+# Untrack the .DS_Store file from Git's memory
+git rm --cached .DS_Store
