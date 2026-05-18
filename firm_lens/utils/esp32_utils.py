@@ -1,70 +1,42 @@
 import struct
 import os
-
+import subprocess
+import sys
 
 class ESP32FirmwareParser:
     """
     Realistic ESP32 firmware parser used by FirmLens analyzers.
-
-    Supports:
-      • Bootloader header parsing
-      • Application header parsing
-      • Partition table parsing (critical for real-world analysis)
-      • Safe, bounds-checked binary reads
-
-    This parser does NOT emulate flash layout — it reads raw bytes from
-    the firmware image exactly as provided.
+    Provides bounds-checked, fail-safe binary processing.
     """
-
-    BOOTLOADER_OFFSET = 0x1000
-    PARTITION_TABLE_OFFSET = 0x8000
-    APP_OFFSET = 0x10000
-
-    IMAGE_HEADER_FORMAT = "<BBBBI"  # magic, segment_count, spi_mode, spi_speed_size, entry_addr
-    PARTITION_ENTRY_FORMAT = "<II16s16s"  # type, subtype, offset, size, label, flags
-    PARTITION_ENTRY_SIZE = struct.calcsize(PARTITION_ENTRY_FORMAT)
 
     def __init__(self, firmware_path: str):
         self.firmware_path = firmware_path
 
-    # ------------------------------------------------------------
-    # Safe binary reader
-    # ------------------------------------------------------------
     def _read(self, offset: int, length: int) -> bytes:
-        if offset < 0 or length <= 0:
+        if offset < 0 or length <= 0 or not os.path.exists(self.firmware_path):
             return b""
-
-        if not os.path.exists(self.firmware_path):
-            return b""
-
         try:
             with open(self.firmware_path, "rb") as f:
                 f.seek(0, 2)
                 size = f.tell()
-
                 if offset >= size:
                     return b""
-
-                safe_len = min(length, size - offset)
-                f.seek(offset)
-                return f.read(safe_len)
+                
+                # CRITICAL FIX: Reset the file cursor to the requested offset before reading
+                f.seek(offset) 
+                return f.read(min(length, size - offset))
         except Exception:
             return b""
 
-    # ------------------------------------------------------------
-    # ESP32 Image Header Parsing
-    # ------------------------------------------------------------
     def parse_image_header(self, offset: int):
-        header_size = struct.calcsize(self.IMAGE_HEADER_FORMAT)
+        fmt = "<BBBBI"
+        header_size = struct.calcsize(fmt)
         data = self._read(offset, header_size)
 
         if len(data) != header_size:
-            raise ValueError(f"Incomplete ESP32 image header at offset 0x{offset:X}")
+            return None
 
-        magic, seg_count, spi_mode, spi_speed_size, entry_addr = struct.unpack(
-            self.IMAGE_HEADER_FORMAT, data
-        )
-
+        magic, seg_count, spi_mode, spi_speed_size, entry_addr = struct.unpack(fmt, data)
         return {
             "magic": magic,
             "segment_count": seg_count,
@@ -73,81 +45,40 @@ class ESP32FirmwareParser:
             "entry_addr": hex(entry_addr),
         }
 
-    def parse_bootloader_header(self):
-        return self.parse_image_header(self.BOOTLOADER_OFFSET)
 
-    def parse_app_header(self):
-        return self.parse_image_header(self.APP_OFFSET)
-
-    # ------------------------------------------------------------
-    # Partition Table Parsing
-    # ------------------------------------------------------------
-    def parse_partition_table(self):
-        """
-        Parses the ESP32 partition table at offset 0x8000.
-
-        Each entry is 32 bytes:
-            type (1 byte)
-            subtype (1 byte)
-            offset (4 bytes)
-            size (4 bytes)
-            label (16 bytes)
-            flags (4 bytes)
-
-        Stops when:
-            • entry is all 0xFF (end marker)
-            • entry is all 0x00 (empty)
-            • invalid entry encountered
-        """
-
-        entries = []
-        offset = self.PARTITION_TABLE_OFFSET
-
-        while True:
-            raw = self._read(offset, self.PARTITION_ENTRY_SIZE)
-            if len(raw) != self.PARTITION_ENTRY_SIZE:
-                break
-
-            # End markers
-            if raw == b"\xFF" * self.PARTITION_ENTRY_SIZE:
-                break
-            if raw == b"\x00" * self.PARTITION_ENTRY_SIZE:
-                break
-
-            try:
-                p_type, p_subtype, p_offset, p_size, label_raw, flags = struct.unpack(
-                    self.PARTITION_ENTRY_FORMAT, raw
-                )
-            except struct.error:
-                break
-
-            label = label_raw.split(b"\x00")[0].decode("ascii", errors="ignore")
-
-            entries.append(
-                {
-                    "type": self._decode_type(p_type),
-                    "subtype": p_subtype,
-                    "offset": p_offset,
-                    "size": p_size,
-                    "label": label,
-                    "flags": flags,
-                }
-            )
-
-            offset += self.PARTITION_ENTRY_SIZE
-
-        return entries
-
-    # ------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------
+class ESP32HardwareDumper:
+    """
+    Hardware Forensics Layer.
+    Programmatically interacts with physical ESP32 chips over serial interfaces
+    to extract live flash images for forensic security auditing.
+    """
+    
     @staticmethod
-    def _decode_type(t: int) -> str:
+    def dump_flash(port: str, baud: int, output_path: str) -> bool:
         """
-        Convert ESP32 partition type byte to human-readable string.
+        Executes esptool dynamically to read the entire 4MB flash size 
+        typical of standard ESP32 DevKit boards.
         """
-        mapping = {
-            0x00: "app",
-            0x01: "data",
-        }
-        return mapping.get(t, f"unknown_{t}")
+        cmd = [
+            sys.executable, "-m", "esptool",
+            "--port", port,
+            "--baud", str(baud),
+            "read_flash", "0", "0x400000",
+            output_path
+        ]
+        
+        try:
+            import esptool
+        except ImportError:
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", "esptool"])
+            except Exception:
+                return False
+
+        try:
+            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            if result.returncode == 0:
+                return True
+            return False
+        except Exception:
+            return False

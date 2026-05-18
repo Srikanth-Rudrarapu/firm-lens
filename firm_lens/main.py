@@ -109,13 +109,36 @@ def categories():
     for cat, desc in categories_list:
         console.print(f"  • [bold cyan]{cat:<20}[/bold cyan] {desc}")
 
-@cli.command(help="Extract binary segments from firmware (ESP32/STM32).")
-@click.argument("firmware_path")
+@cli.command(help="Extract binary segments from firmware (Local File or Live Hardware Device).")
+@click.argument("target_path", required=False)
 @click.option("--chip", type=click.Choice(["esp32", "stm32"]), required=True, help="Target architecture.")
-def extract(firmware_path, chip):
+@click.option("--live-port", "-p", type=str, help="Serial port (e.g., COM3 or /dev/ttyUSB0) to dump live device firmware.")
+@click.option("--baud", "-b", type=int, default=460800, help="Baud rate for hardware extraction.")
+def extract(target_path, chip, live_port, baud):
+    if live_port:
+        if chip != "esp32":
+            console.print("[error]Live hardware extraction currently only supported for ESP32 targets.[/error]")
+            return
+        
+        console.print(f"[info]🔌 Initializing Hardware Forensics Engine on port {live_port}...[/info]")
+        target_path = "reports/extracted_hardware_flash.bin"
+        os.makedirs("reports", exist_ok=True)
+        
+        # Call out to the utility helper to run the physical dump
+        from firm_lens.utils.esp32_utils import ESP32HardwareDumper
+        success = ESP32HardwareDumper.dump_flash(live_port, baud, target_path)
+        if not success:
+            console.print("[error]❌ Hardware firmware acquisition failed.[/error]")
+            return
+        console.print(f"[success]✔ Live firmware successfully dumped to local disk:[/success] {target_path}")
+
+    if not target_path or not os.path.exists(target_path):
+        console.print("[error]Error: Please specify a valid local firmware path or use --live-port.[/error]")
+        return
+
     extractor = ESP32Extractor() if chip == "esp32" else STM32Extractor()
-    output = extractor.extract(firmware_path)
-    console.print(f"[success]Extraction complete:[/success] {output}")
+    output = extractor.extract(target_path)
+    console.print(f"[success]Extraction complete layout generated:[/success] Components mapped out successfully.")
 
 @cli.command()
 @click.argument("firmware_path")
@@ -148,15 +171,36 @@ def init_db(ctx):
 def run_analyzers(path, report_format, base_output_dir, explicit_output):
     """Orchestrates the analysis suite, injects CVE maps, and builds the report."""
     
-    # 1. Automatically detect target and extract segment architecture first
-    console.print("[info]Extracting firmware layout maps...[/info]")
+    # 1. CRITICAL FIX: Always pre-load the raw binary stream into memory first
     try:
-        # Detect or assume chip type (e.g., esp32) to generate structural context
-        extractor = ESP32Extractor() 
-        firmware_map = extractor.extract(path)  # Generates memory segments/partitions dict
+        with open(path, "rb") as f:
+            raw_binary_bytes = f.read()
     except Exception as e:
-        console.print(f"[warning]Structural extraction bypassed, falling back to raw path: {e}[/warning]")
-        firmware_map = {"raw_path": path}
+        console.print(f"[error]Failed to read target binary file stream: {str(e)}[/error]")
+        return
+
+    console.print("[info]Extracting firmware layout maps...[/info]")
+    
+    # Baseline firmware map setup to protect downstream analyzers from empty dicts
+    firmware_map = {
+        "raw_path": path,
+        "raw_binary": raw_binary_bytes,
+        "segments": [],
+        "partitions": [],
+        "is_unified_flash": True if os.path.getsize(path) >= 0x400000 else False
+    }
+
+    try:
+        extractor = ESP32Extractor() 
+        extracted_map = extractor.extract(path)  
+        if extracted_map:
+            # Merge extracted data over our safe baseline container
+            firmware_map.update(extracted_map)
+            if "raw_binary" not in firmware_map or not firmware_map["raw_binary"]:
+                firmware_map["raw_binary"] = raw_binary_bytes
+    except Exception as e:
+        console.print(f"[warning]Structural extraction bypassed, falling back to raw stream map: {e}[/warning]")
+        # Baseline is already set, so we safely fall through
 
     # 2. Establish Environmental Fingerprints
     env_findings = []
@@ -218,6 +262,13 @@ def run_analyzers(path, report_format, base_output_dir, explicit_output):
                 cwes=[],
                 component=name
             )]
+# ==========================================
+    # TEMPORARY O1 DEBUG ENGINE INJECTION
+    # ==========================================
+    console.print(f"\n[bold yellow]🔍 DEBUG: Analysis complete. Found {len(all_findings)} modules with results.[/bold yellow]")
+    for module_name, findings_list in all_findings.items():
+        console.print(f"  • [cyan]{module_name:<30}[/cyan] -> Detected: [bold green]{len(findings_list)} findings[/bold green]")
+    # ==========================================
 
     # 5. Generate finalized clean report sheets
     generator = ReportGenerator(base_output_dir)

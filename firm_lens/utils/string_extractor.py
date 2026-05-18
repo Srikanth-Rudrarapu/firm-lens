@@ -1,53 +1,41 @@
-import os
+import re
 from typing import List, Tuple
-
 
 class StringExtractor:
     """
-    Extract printable strings from firmware images.
-
-    Features:
-      • ASCII + UTF-8 safe extraction
-      • Tracks byte offsets for each string
-      • Minimum length filtering
-      • Works on large firmware images efficiently
-
-    Output:
-      List of tuples: (offset, string)
+    Industrial-grade High-Performance String Carving Engine.
+    Leverages a optimized regular expression execution matrix to extract 
+    printable ASCII streams from massive raw binary buffers safely and instantly.
     """
 
     def __init__(self, min_length: int = 4):
         self.min_length = min_length
+        # Pre-compile the pattern to process binary data streams at the native C-level.
+        # This matches printable ASCII characters ranging from space (0x20) to tilde (0x7E).
+        self.pattern = re.compile(rb'[\x20-\x7E]{' + str(min_length).encode() + rb',}')
 
-    def extract(self, firmware_path: str) -> List[Tuple[int, str]]:
-        if not os.path.exists(firmware_path):
+    def extract_from_bytes(self, data: bytes) -> List[Tuple[int, str]]:
+        """
+        Scans a raw binary byte array and extracts strings alongside their exact offsets.
+        
+        Returns:
+            A list of tuples containing (byte_offset, decoded_ascii_string).
+        """
+        if not data or not isinstance(data, (bytes, bytearray)):
             return []
 
-        results: List[Tuple[int, str]] = []
+        findings: List[Tuple[int, str]] = []
+        
+        # re.finditer handles large 4MB arrays natively with minimal memory allocations
+        for match in self.pattern.finditer(data):
+            try:
+                # Extract address offset and decode byte content safely
+                offset = match.start()
+                decoded_str = match.group().decode("ascii", errors="ignore").strip()
+                
+                if decoded_str:
+                    findings.append((offset, decoded_str))
+            except Exception:
+                continue
 
-        try:
-            with open(firmware_path, "rb") as f:
-                data = f.read()
-        except Exception:
-            return []
-
-        current = []
-        start_offset = None
-
-        for i, b in enumerate(data):
-            if 32 <= b <= 126:  # printable ASCII
-                if start_offset is None:
-                    start_offset = i
-                current.append(chr(b))
-            else:
-                # End of a string
-                if current and len(current) >= self.min_length:
-                    results.append((start_offset, "".join(current)))
-                current = []
-                start_offset = None
-
-        # Handle trailing string
-        if current and len(current) >= self.min_length:
-            results.append((start_offset, "".join(current)))
-
-        return results
+        return findings

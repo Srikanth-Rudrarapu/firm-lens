@@ -30,4 +30,5 @@ class Finding:
             f"  • CWEs: {cwe_str}\n"
             f"  • Evidence: {self.evidence}\n"
             f"  • Offset: {self.offset}\n"
+            f"  • Component: {self.component}\n"
         )

@@ -1,76 +1,103 @@
 import math
 import re
-from typing import List
+from typing import List, Dict, Any
+import os
 from firm_lens.utils.findings import Finding
 
 class SecretsAnalyzer:
+    """
+    Optimized High-Density Secrets & Key Entropy Analyzer.
+    Uses a fast single-pass frequency algorithm to isolate cryptographic assets.
+    """
     def __init__(self):
+        # Focus on explicit target patterns that won't pollute string extractor scans
         self.signatures = {
-            "Private Key": r"-----BEGIN [A-Z ]*PRIVATE KEY-----",
-            "WiFi SSID": r"WIFI_SSID",
-            "WiFi Password": r"WIFI_PASS",
+            "WiFi SSID Marker": r"WIFI_SSID",
+            "WiFi Password Marker": r"WIFI_PASS",
             "NVS Reference": r"nvs"
         }
 
-    def calculate_entropy(self, data: bytes) -> float:
-        """Calculates Shannon Entropy (0.0 to 8.0)."""
-        if not data: return 0.0
-        entropy = 0
-        for x in range(256):
-            p_x = float(data.count(x)) / len(data)
-            if p_x > 0:
-                entropy += - p_x * math.log(p_x, 2)
+    def _fast_entropy(self, data: bytes) -> float:
+        """Calculates Shannon Entropy in a single linear pass (O(N))."""
+        if not data: 
+            return 0.0
+        length = len(data)
+        counts = [0] * 256
+        for byte in data:
+            counts[byte] += 1
+        
+        entropy = 0.0
+        for count in counts:
+            if count > 0:
+                p = count / length
+                entropy -= p * math.log2(p)
         return entropy
 
-    def run(self, firmware_path: str) -> List[Finding]:
+    def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
         findings = []
-        with open(firmware_path, "rb") as f:
-            content = f.read()
+        content = firmware_map.get("raw_binary", b"")
 
-        # 1. High-Entropy Scanner (Industrial Grade)
-        window_size = 64
-        for i in range(0, len(content) - window_size, 32):
+        if not content and os.path.exists(firmware_path):
+            try:
+                with open(firmware_path, "rb") as f:
+                    content = f.read()
+            except OSError:
+                pass
+
+        if not content:
+            return []
+
+        # 1. Optimized Block Entropy Scanner (Avoids hanging on large 4MB dumps)
+        window_size = 128
+        step_size = 64  # Increased step to optimize performance while maintaining coverage
+        
+        for i in range(0, len(content) - window_size, step_size):
             window = content[i:i+window_size]
-            entropy = self.calculate_entropy(window)
-            if entropy > 7.5:  # Indicates encryption or high-density secrets
+            entropy = self._fast_entropy(window)
+            
+            # High-density entropy check (typically indicates raw private keys or embedded binaries)
+            if entropy > 7.7:  
                 findings.append(Finding(
                     id="FIRM-SECRET-002",
-                    title="High-Entropy Data Block",
-                    description="Detected a block of high-entropy data not matching common patterns. Likely an obfuscated key or encrypted segment.",
+                    title="High-Entropy Data Fragment",
+                    description="Detected a localized block of high-entropy data. Likely an obfuscated key, custom token, or localized encrypted configuration structure.",
                     severity="High",
-                    cwes=["CWE-311"],
-                    evidence=f"Entropy: {entropy:.2f}",
-                    offset=i,
-                    component="firmware"
+                    cwes=["CWE-312"],
+                    evidence=f"Local Entropy Density: {entropy:.2f}",
+                    offset=hex(i),
+                    component="entropy_engine"
                 ))
 
-        # 2. Aggregated Signature Scanner
+        # 2. Pattern Matching Signature Check
         for name, pattern in self.signatures.items():
             matches = list(re.finditer(pattern.encode(), content))
-            if not matches: continue
+            if not matches: 
+                continue
 
             if name == "NVS Reference" and len(matches) > 5:
-                # Aggregate 70+ instances into one professional finding
                 findings.append(Finding(
                     id="FIRM-SECRET-003",
-                    title=f"Systemic {name} Detected",
-                    description=f"Identified {len(matches)} instances of {name} throughout the binary. Indicates wide use of unencrypted storage.",
+                    title=f"Systemic {name} Usage Identified",
+                    description=f"Identified {len(matches)} structural NVS tracking references throughout the binary image map, indicating extensive programmatic usage of Non-Volatile Storage.",
                     severity="Medium",
                     cwes=["CWE-798"],
-                    evidence=f"Found {len(matches)} instances",
-                    offset=matches[0].start(), # Show first location
-                    component="flash"
+                    evidence=f"Aggregated Count: {len(matches)} calls parsed.",
+                    offset=hex(matches[0].start()),
+                    component="flash_nvs"
                 ))
             else:
                 for match in matches:
                     findings.append(Finding(
                         id="FIRM-SECRET-001",
-                        title=f"Detected {name}",
-                        description=f"Hardcoded {name} identified via signature matching.",
-                        severity="Critical" if "Key" in name or "Pass" in name else "Medium",
-                        cwes=["CWE-798", "CWE-321"],
-                        evidence=match.group().decode(errors="ignore"),
-                        offset=match.start(),
-                        component="firmware"
+                        title=f"Hardcoded {name} Discovered",
+                        description=f"A hardcoded compiler symbol reference matching {name} rules was detected.",
+                        severity="Critical" if "Pass" in name else "Medium",
+                        cwes=["CWE-798"],
+                        evidence=match.group().decode(errors="ignore")[:64],
+                        offset=hex(match.start()),
+                        component="firmware_data"
                     ))
         return findings
+
+    def run(self, firmware_path: str) -> List[Finding]:
+        return self.run_with_map(firmware_path, {"raw_binary": b""})

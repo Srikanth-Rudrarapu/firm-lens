@@ -16,7 +16,8 @@ authors = [
 dependencies = [
     "rich",
     "click",
-    "pycryptodome"
+    "pycryptodome",
+    "esptool>=4.5.0"
 ]
 
 classifiers = [

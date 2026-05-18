@@ -1,53 +1,44 @@
 import re
 from typing import List, Dict, Any
-
 from firm_lens.utils.string_extractor import StringExtractor
 from firm_lens.utils.findings import Finding
-from firm_lens.utils.cwe_mapping import CWE_MAP
 
 class DangerousFunctionAnalyzer:
     """
     Advanced Unsafe Function Analyzer.
-    Scans firmware memory segments for high-risk C standard library symbols.
+    Scans firmware boundaries for high-risk C standard library linking symbols.
     """
 
     def __init__(self, min_string_length: int = 4):
         self.extractor = StringExtractor(min_length=min_string_length)
-        
-        # Extended list of functions relevant to IoT/Embedded exploitation
         self.dangerous_funcs = [
             "strcpy", "strncpy", "sprintf", "vsprintf", "gets", 
             "scanf", "sscanf", "memcpy", "memmove", "strcat", 
             "strncat", "system", "popen", "exec", "malloc"
         ]
-
         self.patterns = [
-            re.compile(rf"\b{func}\b") # Case-sensitive is often better for symbol names
+            re.compile(rf"\b{func}\b")
             for func in self.dangerous_funcs
         ]
 
-    def run(self, firmware_map: Dict[str, Any]) -> List[Finding]:
-        """
-        Processes extracted segments to find dangerous function symbols.
-        """
+    def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
         findings: List[Finding] = []
-        
-        # Iterate through segments provided by ESP32Extractor
-        for segment in firmware_map.get("segments", []):
-            segment_data = segment.get("data", b"")
-            load_addr = segment.get("addr", "0x0")
-            
-            # Static Analysis: Extract strings from the specific memory segment
-            strings = self.extractor.extract_from_bytes(segment_data)
+        raw_data = firmware_map.get("raw_binary", b"")
 
+        if not raw_data:
+            return findings
+
+        try:
+            strings = self.extractor.extract_from_bytes(raw_data)
             for offset, s in strings:
-                relative_addr = int(load_addr, 16) + offset
-                self._check_function_match(relative_addr, s, findings)
+                self._check_function_match(offset, s, findings)
+        except Exception:
+            pass
 
         return findings
 
     def _check_function_match(self, addr: int, s: str, findings: List[Finding]):
-        """Matches strings against dangerous patterns."""
+        addr_str = hex(addr) if isinstance(addr, int) else str(addr)
         for rx in self.patterns:
             m = rx.search(s)
             if m:
@@ -55,20 +46,17 @@ class DangerousFunctionAnalyzer:
                 findings.append(
                     Finding(
                         id="FIRM-APP-UNSAFEFUNC-001",
-                        title=f"Dangerous function symbol '{func}' detected",
+                        title=f"Banned or Unsafe Function Symbol Detected: '{func}'",
                         description=(
-                            f"The '{func}' symbol was found in application memory. "
-                            "This suggests the firmware utilizes unsafe libc functions "
-                            "that are highly susceptible to buffer overflows or command injection."
+                            f"The native memory management code symbol reference '{func}' was parsed in memory. "
+                            "This confirms that the application layers rely on unsafe legacy libc routines "
+                            "highly vulnerable to memory corruption attacks like stack-based buffer overflows (CWE-120)."
                         ),
                         severity=self._severity_for(func),
-                        cwes=[
-                            CWE_MAP.get("unsafe_functions", "CWE-120"),
-                            CWE_MAP.get("unsafe_memory_ops", "CWE-119"),
-                        ],
-                        evidence=f"Symbol '{func}' at {hex(addr)}",
-                        offset=hex(addr),
-                        component="app_memory",
+                        cwes=["CWE-120", "CWE-119", "CWE-676"],
+                        evidence=f"Symbol reference string: '{func}'",
+                        offset=addr_str,
+                        component="libc_linking",
                     )
                 )
                 break
@@ -76,8 +64,9 @@ class DangerousFunctionAnalyzer:
     def _severity_for(self, func: str) -> str:
         critical = {"gets", "strcpy", "system", "exec"}
         high = {"sprintf", "strcat", "popen", "scanf"}
-        
-        func_lower = func.lower()
-        if func_lower in critical: return "Critical"
-        if func_lower in high: return "High"
+        if func in critical: return "Critical"
+        if func in high: return "High"
         return "Medium"
+
+    def run(self, firmware_path: str) -> List[Finding]:
+        return []

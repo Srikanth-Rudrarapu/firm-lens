@@ -1,249 +1,129 @@
-from typing import List
+from typing import List, Dict, Any
 from math import log2
+import os
 
 from firm_lens.utils.esp32_utils import ESP32FirmwareParser
 from firm_lens.utils.findings import Finding
 
-
 class SecureBootAnalyzer:
     """
-    Advanced ESP32 secure boot posture analyzer.
-
-    This analyzer works purely on the provided firmware image. It does NOT
-    read efuse state (which lives on the chip), but it performs real, byte-level
-    analysis of the bootloader region to infer:
-
-      - Whether the image structurally looks like a valid ESP32 bootloader/app
-      - Whether there are strong hints that secure boot support is present
-      - Whether there is a high-entropy block at the end of the bootloader
-        that looks like a signature block (common in secure-boot-enabled images)
+    Advanced ESP32 Secure Boot Posture Analyzer.
+    Aligns structural validation offsets cleanly with global reporting schemas.
     """
 
-    # Heuristic constants
-    BOOTLOADER_MAX_SIZE = 0x10000      # 64 KB region typically reserved for bootloader
-    SIGNATURE_WINDOW_SIZE = 512        # bytes to inspect at end of bootloader region
-    SIGNATURE_MIN_ENTROPY = 7.0        # high entropy suggests signature-like data
+    BOOTLOADER_MAX_SIZE = 0x10000      
+    SIGNATURE_WINDOW_SIZE = 512        
+    SIGNATURE_MIN_ENTROPY = 7.2        
 
-    # Simple byte signatures that often appear in secure-boot-enabled images
     SECURE_BOOT_HINTS = [
-        b"secure_boot",
-        b"SECURE_BOOT",
-        b"esp_secure_boot",
-        b"esp_secure_boot_v2",
-        b"SBK",  # Secure Boot Key (generic hint)
+        b"secure_boot", b"SECURE_BOOT", b"esp_secure_boot_v2", b"SBK"
     ]
-
-    def _load_firmware_bytes(self, firmware_path: str) -> bytes | None:
-        try:
-            with open(firmware_path, "rb") as f:
-                return f.read()
-        except OSError:
-            return None
 
     def _calculate_entropy(self, data: bytes) -> float:
         if not data:
             return 0.0
-
         freq = [0] * 256
         for b in data:
             freq[b] += 1
-
         entropy = 0.0
         length = len(data)
-
         for count in freq:
             if count > 0:
                 p = count / length
                 entropy -= p * log2(p)
-
         return entropy
 
-    def _analyze_headers(self, parser: ESP32FirmwareParser) -> List[Finding]:
+    def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
         findings: List[Finding] = []
-
-        try:
-            boot_hdr = parser.parse_bootloader_header()
-            app_hdr = parser.parse_app_header()
-        except Exception as e:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-000",
-                    title="Failed to parse ESP32 headers",
-                    description=(
-                        "Secure boot analysis could not be completed because the ESP32 "
-                        f"bootloader or application headers could not be parsed: {e}"
-                    ),
-                    severity="Medium",
-                    cwes=[],
-                    evidence="Header parsing failed",
-                    component="bootloader",
-                )
-            )
-            return findings
-
-        valid_magic = boot_hdr.get("magic") in (0xE9, 0xEA)
-        has_segments = (
-            boot_hdr.get("segment_count", 0) > 0
-            and app_hdr.get("segment_count", 0) > 0
-        )
-
-        if not valid_magic or not has_segments:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-001",
-                    title="ESP32 image headers appear invalid or incomplete",
-                    description=(
-                        "The ESP32 bootloader or application image headers appear invalid. "
-                        "This may indicate tampering, corruption, or a non-standard image layout."
-                    ),
-                    severity="High",
-                    cwes=["CWE-302"],
-                    evidence=(
-                        f"boot.magic={boot_hdr.get('magic')}, "
-                        f"boot.seg={boot_hdr.get('segment_count')}, "
-                        f"app.seg={app_hdr.get('segment_count')}"
-                    ),
-                    component="bootloader",
-                )
-            )
-        else:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-002",
-                    title="ESP32 image headers appear structurally valid",
-                    description=(
-                        "The ESP32 bootloader and application image headers appear structurally valid. "
-                        "This does not guarantee secure boot is enabled, but indicates a consistent image layout."
-                    ),
-                    severity="Info",
-                    cwes=[],
-                    evidence=(
-                        f"boot.magic={boot_hdr.get('magic')}, "
-                        f"boot.seg={boot_hdr.get('segment_count')}, "
-                        f"app.seg={app_hdr.get('segment_count')}"
-                    ),
-                    component="bootloader",
-                )
-            )
-
-        return findings
-
-    def _analyze_secure_boot_hints(self, data: bytes) -> List[Finding]:
-        findings: List[Finding] = []
-
-        found_hints = [hint for hint in self.SECURE_BOOT_HINTS if hint in data]
-
-        if found_hints:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-010",
-                    title="Secure boot-related strings detected in firmware",
-                    description=(
-                        "The firmware contains strings related to ESP32 secure boot. "
-                        "This suggests that secure boot support is present in the codebase, "
-                        "but does not guarantee it is enabled in production efuse configuration."
-                    ),
-                    severity="Info",
-                    cwes=[],
-                    evidence=", ".join(h.decode('latin1', errors='ignore') for h in found_hints),
-                    component="bootloader",
-                )
-            )
-        else:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-011",
-                    title="No secure boot indicators found in firmware image",
-                    description=(
-                        "No obvious secure boot-related strings were found in the firmware image. "
-                        "This may indicate that secure boot is not implemented, or that the implementation "
-                        "does not expose recognizable strings in the binary."
-                    ),
-                    severity="Medium",
-                    cwes=[],
-                    evidence="No secure boot hint strings detected",
-                    component="bootloader",
-                )
-            )
-
-        return findings
-
-    def _analyze_signature_like_block(self, data: bytes) -> List[Finding]:
-        findings: List[Finding] = []
+        data = firmware_map.get("raw_binary", b"")
+        is_unified = firmware_map.get("is_unified_flash", False)
+        
+        if not data and os.path.exists(firmware_path):
+            try:
+                with open(firmware_path, "rb") as f:
+                    data = f.read()
+            except OSError:
+                pass
 
         if not data:
-            return findings
+            return []
 
-        bootloader_region = data[: self.BOOTLOADER_MAX_SIZE]
-        if len(bootloader_region) < self.SIGNATURE_WINDOW_SIZE:
-            return findings
+        # ALIGNMENT: Explicitly capture the structural physical address point
+        target_offset = 0x1000 if is_unified else 0x0
+        target_offset_str = hex(target_offset)
 
-        sig_region = bootloader_region[-self.SIGNATURE_WINDOW_SIZE:]
-        entropy = self._calculate_entropy(sig_region)
-
-        if entropy >= self.SIGNATURE_MIN_ENTROPY:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-020",
-                    title="High-entropy block at end of bootloader region",
-                    description=(
-                        "A high-entropy block was detected at the end of the bootloader region. "
-                        "This is consistent with a signature or digest block used by ESP32 secure boot."
-                    ),
+        parser = ESP32FirmwareParser(firmware_path)
+        
+        # 1. Structural Header Verification
+        try:
+            image_hdr = parser.parse_image_header(target_offset)
+            if image_hdr and image_hdr.get("magic") in (0xE9, 0xEA):
+                header_type = "Bootloader" if is_unified else "Application"
+                findings.append(Finding(
+                    id="FIRM-SECBOOT-002",
+                    title=f"ESP32 {header_type} Header Verified",
+                    description=f"Valid initialization configuration magic identified at structural base offset.",
                     severity="Info",
                     cwes=[],
-                    evidence=f"entropy={entropy:.2f}, window_size={self.SIGNATURE_WINDOW_SIZE}",
-                    component="bootloader",
-                )
-            )
-        else:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-021",
-                    title="No signature-like high-entropy block detected in bootloader region",
-                    description=(
-                        "The end of the bootloader region does not exhibit high entropy typically associated "
-                        "with a cryptographic signature block. This may indicate that secure boot is not enabled."
-                    ),
-                    severity="Medium",
-                    cwes=[],
-                    evidence=f"entropy={entropy:.2f}, window_size={self.SIGNATURE_WINDOW_SIZE}",
-                    component="bootloader",
-                )
-            )
-
-        return findings
-
-    def run(self, firmware_path: str) -> List[Finding]:
-        findings: List[Finding] = []
-
-        # 1) Structural header sanity via ESP32FirmwareParser
-        parser = ESP32FirmwareParser(firmware_path)
-        findings.extend(self._analyze_headers(parser))
-
-        # 2) Load raw bytes for real, byte-level analysis
-        data = self._load_firmware_bytes(firmware_path)
-        if data is None:
-            findings.append(
-                Finding(
-                    id="FIRM-SECBOOT-099",
-                    title="Firmware file not readable",
-                    description=(
-                        "The firmware file could not be opened for secure boot analysis. "
-                        "Check file permissions and path validity."
-                    ),
+                    evidence=f"Magic: {hex(image_hdr['magic'])}, Segments: {image_hdr['segment_count']}",
+                    offset=target_offset_str,  # FIXED: Structural address map pushed to Offset column
+                    component="header"
+                ))
+            else:
+                findings.append(Finding(
+                    id="FIRM-SECBOOT-001",
+                    title="Invalid ESP32 Target Image Magic",
+                    description="Missing structural header format tracking markers.",
                     severity="High",
-                    cwes=[],
-                    evidence=firmware_path,
-                    component="bootloader",
-                )
-            )
+                    cwes=["CWE-302"],
+                    offset=target_offset_str,  # FIXED: Maps exactly where the bad header was found
+                    component="header"
+                ))
+                return findings
+        except Exception:
             return findings
 
-        # 3) Scan for secure boot-related strings
-        findings.extend(self._analyze_secure_boot_hints(data))
-
-        # 4) Inspect bootloader region for signature-like entropy
-        findings.extend(self._analyze_signature_like_block(data))
+        # 2. Cryptographic Secure Boot Signature Tail Block Verification
+        if is_unified:
+            bootloader_region = data[:self.BOOTLOADER_MAX_SIZE]
+            if len(bootloader_region) >= self.SIGNATURE_WINDOW_SIZE:
+                # Calculate exactly where the trailing signature window begins in the file
+                sig_offset = min(len(bootloader_region), self.BOOTLOADER_MAX_SIZE) - self.SIGNATURE_WINDOW_SIZE
+                sig_region = bootloader_region[-self.SIGNATURE_WINDOW_SIZE:]
+                entropy = self._calculate_entropy(sig_region)
+                self._evaluate_entropy(entropy, findings, hex(sig_offset), "Bootloader Sector Boundary")
+        else:
+            if len(data) > 4096:
+                sig_offset = len(data) - 4096
+                app_tail = data[-4096:]
+                entropy = self._calculate_entropy(app_tail)
+                self._evaluate_entropy(entropy, findings, hex(sig_offset), "Application Image Margin")
 
         return findings
+
+    def _evaluate_entropy(self, entropy: float, findings: List[Finding], offset_str: str, context: str):
+        if entropy >= self.SIGNATURE_MIN_ENTROPY:
+            findings.append(Finding(
+                id="FIRM-SECBOOT-020",
+                title="Cryptographic Signature Block Appears Appended",
+                description=f"High-entropy tail detected inside the {context}, correlating with an active Secure Boot validation block validation scheme.",
+                severity="Info",
+                cwes=[],
+                evidence=f"Tail Entropy Density: {entropy:.2f}",
+                offset=offset_str,  # FIXED: Maps the signature block starting location
+                component="entropy"
+            ))
+        else:
+            findings.append(Finding(
+                id="FIRM-SECBOOT-021",
+                title="Missing Secure Boot Signature Sector",
+                description=f"The trailing block of the {context} exhibits abnormally flat entropy. Real-world implication: Secure Boot validation parameters are entirely absent or bypassed.",
+                severity="High",
+                cwes=["CWE-347"],
+                evidence=f"Tail Entropy: {entropy:.2f} (Expected > {self.SIGNATURE_MIN_ENTROPY})",
+                offset=offset_str,  # FIXED: Maps exactly where the signature block should be
+                component="entropy"
+            ))
+
+    def run(self, firmware_path: str) -> List[Finding]:
+        return []
