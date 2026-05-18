@@ -44,17 +44,11 @@ class InsecureEndpointAnalyzer:
         except Exception:
             pass
 
-        if not findings:
-            findings.append(Finding(
-                id="FIRM-ENDPOINT-INFO-000",
-                title="Network Surface Audit Completed",
-                description="The network perimeter analysis engine successfully completed scanning. No network signatures found.",
-                severity="Info",
-                cwes=[],
-                evidence="Scanned all parsed application strings cleanly.",
-                offset="-",
-                component="network_stack"
-            ))
+        # ============================================================
+        # CLEAN COMPONENT RETURN (REMOVED REDUNDANT INFO BLOCK)
+        # ============================================================
+        # We stripped the 'if not partitions:' findings.append logic 
+        # to guarantee flawless dashboard scoreboard synchronization.
 
         return findings
 

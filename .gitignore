@@ -12,4 +12,5 @@ firm_lens.egg-info/
 *.egg-info/
 
 # Untrack the .DS_Store file from Git's memory
-git rm --cached .DS_Store
+git rm --cached .DS_Store.DS_Store
+firm_lens/.DS_Store

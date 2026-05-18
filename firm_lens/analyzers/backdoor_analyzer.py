@@ -6,22 +6,23 @@ from firm_lens.utils.findings import Finding
 class BackdoorAnalyzer:
     """
     Advanced Backdoor & Hidden Interface Analyzer.
-    Dynamically scans raw text assets for unauthorized administrative paths and tokens.
+    Dynamically scans text segments to isolate hidden developer diagnostic shells,
+    unauthorized administrative command paths, and firmware maintenance bypass loops.
     """
 
     def __init__(self, min_string_length: int = 4):
         self.extractor = StringExtractor(min_length=min_string_length)
         
-        # Broad-spectrum multi-architecture regular expression matrix
+        # Expanded multi-vector engineering pattern grid
         self.patterns = {
-            # 1. High-Risk Web/API URI Routing Paths
-            "admin_paths": re.compile(r"\b/(?:admin|root|shell|debug|backdoor|maintenance|setup|config)\b[a-zA-Z0-9_\-/]*"),
+            # 1. Expanded High-Risk Administrative/Control URI Routing Paths
+            "admin_paths": re.compile(r"\b/(?:shell|backdoor|maintenance|godmode|root_login|debug(?:/[a-z_]+)?|exec|config)\b[a-zA-Z0-9_\-/]*"),
             
-            # 2. Hardcoded Session Tokens & API Secret Key Assignment Structures
-            "auth_tokens": re.compile(r"\b(api[-_]?key|auth[-_]?token|jwt[-_]?token|secret[-_]?key|passwd|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-]{10,})['\"]?", re.IGNORECASE),
+            # 2. Strict Interactive Low-Level Shell Commands / Diagnostic Strings
+            "shell_commands": re.compile(r"^/(bin/)?(sh|bash|ash|zsh)$|^\s*(sh|bash|ash)\s+\-c\b"),
             
-            # 3. Serial & Shell Console System Diagnostics Indicators
-            "debug_keywords": re.compile(r"\b(?:godmode|backdoor|hidden[-_]menu|secret[-_]menu|debug[-_]shell|uart[-_]debug|telnet\s+server)\b", re.IGNORECASE)
+            # 3. Development Bypass Keyphrases & Debug Protocol Headers (CWE-489 / CWE-912)
+            "bypass_triggers": re.compile(r"\b(?:bypass_auth|skip_verification|enable_hidden_menu|uart_force_debug|x\-debug\-[a-z\-]+|debug_token)\b", re.IGNORECASE)
         }
 
     def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
@@ -33,69 +34,88 @@ class BackdoorAnalyzer:
 
         try:
             strings = self.extractor.extract_from_bytes(raw_data)
-            for offset, s in strings:
-                self._check_all_patterns(offset, s, findings)
+            
+            shell_match_count = 0
+            first_shell_offset = None
+            shell_evidence_sample = ""
+
+            for offset, found_str in strings:
+                cleaned_str = found_str.strip()
+                addr_str = hex(offset)
+                
+                # Check Vector 1: Unauthorized Direct Access Routing Paths (e.g., /debug/exec)
+                m_path = self.patterns["admin_paths"].search(cleaned_str)
+                if m_path:
+                    path_str = m_path.group(0)
+                    findings.append(Finding(
+                        id="FIRM-BACKDOOR-PATH-001",
+                        title="Hidden Administrative/Debug URI Path Discovered",
+                        description=(
+                            f"An unauthenticated sensitive administrative, maintenance, or code execution route structure "
+                            f"('{path_str}') was located inside string memory configurations. These pathways provide entry "
+                            "points for unauthorized system administration commands."
+                        ),
+                        severity="High",
+                        cwes=["CWE-425", "CWE-912"],
+                        evidence=path_str,
+                        offset=addr_str,
+                        component="hidden_routing"
+                    ))
+
+                # Check Vector 2: Active Reverse Shell or Terminal Instantiations
+                m_shell = self.patterns["shell_commands"].search(cleaned_str)
+                if m_shell:
+                    shell_match_count += 1
+                    if first_shell_offset is None:
+                        first_shell_offset = offset
+                        shell_evidence_sample = cleaned_str
+
+                # Check Vector 3: Integrity Logic Bypasses & Custom Debug Headers (e.g., X-Debug-Token)
+                m_bypass = self.patterns["bypass_triggers"].search(cleaned_str)
+                if m_bypass:
+                    kw_str = m_bypass.group(0)
+                    findings.append(Finding(
+                        id="FIRM-BACKDOOR-KW-003",
+                        title="Developer Bypass/Diagnostic Logic Gate Isolated",
+                        description=(
+                            f"A raw verification bypass keyphrase, custom debug header configuration key, or diagnostic "
+                            f"developer shortcut string ('{kw_str}') was confirmed active in instruction segments."
+                        ),
+                        severity="High",
+                        cwes=["CWE-489", "CWE-912"],
+                        evidence=cleaned_str[:100],
+                        offset=addr_str,
+                        component="debug_interface"
+                    ))
+
+            # Consolidate shell findings into a high-fidelity alert
+            if shell_match_count > 0:
+                severity = "Critical" if "bin" in shell_evidence_sample or "-" in shell_evidence_sample else "Medium"
+                findings.append(Finding(
+                    id="FIRM-BACKDOOR-SHELL-002",
+                    title="Embedded Interactive Shell Environment Reference Verified",
+                    description=(
+                        f"Isolated {shell_match_count} distinct interactive command environment sequences. "
+                        "The presence of explicit binary system shell parameters inside firmware vectors indicate "
+                        "vulnerability to remote command injection execution or active diagnostic configuration interfaces left exposed."
+                    ),
+                    severity=severity,
+                    cwes=["CWE-78", "CWE-912"],
+                    evidence=f"Aggregated Matches: {shell_match_count} calls parsed. Entry sample: '{shell_evidence_sample}'",
+                    offset=hex(first_shell_offset) if first_shell_offset else "-",
+                    component="shell_execution"
+                ))
+
         except Exception:
             pass
 
-        if not findings:
-            findings.append(Finding(
-                id="FIRM-BACKDOOR-INFO-000",
-                title="Hidden Administrative Surface Verification Completed",
-                description="The hidden access pathway audit layer successfully completed scanning. Zero high-risk keywords found.",
-                severity="Info",
-                cwes=[],
-                evidence="Inspected raw string extraction boundaries cleanly.",
-                offset="-",
-                component="auth_logic"
-            ))
+        # ============================================================
+        # CLEAN COMPONENT RETURN (REMOVED DUMMY INFO INJECTION)
+        # ============================================================
+        # We completely removed the 'if not findings:' block to prevent
+        # artificial scoreboard inflation. If the list is empty, it stays empty
 
         return findings
 
-    def _check_all_patterns(self, addr: int, s: str, findings: List[Finding]):
-        addr_str = hex(addr) if isinstance(addr, int) else str(addr)
-
-        # Dynamic Route Extraction
-        m_path = self.patterns["admin_paths"].search(s)
-        if m_path:
-            path_str = m_path.group(0)
-            findings.append(Finding(
-                id="FIRM-BACKDOOR-PATH-001",
-                title="Hidden Administrative/Debug URI Path Discovered",
-                description=f"An unauthenticated sensitive administrative or maintenance web directory path structure ('{path_str}') was found compiled inside data storage blocks.",
-                severity="High",
-                cwes=["CWE-425", "CWE-912"],
-                evidence=path_str,
-                offset=addr_str,
-                component="hidden_routing"
-            ))
-
-        # Dynamic Token/Secret Parsing
-        m_token = self.patterns["auth_tokens"].search(s)
-        if m_token:
-            token_str = m_token.group(0)
-            findings.append(Finding(
-                id="FIRM-BACKDOOR-TOKEN-002",
-                title="Hardcoded Authorization Token/Key Pattern Matched",
-                description="A static string matching common assignment patterns for API keys, bearer tokens, or structural credentials was found exposed directly inside system instructions.",
-                severity="Critical",
-                cwes=["CWE-798"],
-                evidence=token_str[:120],
-                offset=addr_str,
-                component="static_credentials"
-            ))
-
-        # Dynamic Debug Keyword Triggers
-        m_debug = self.patterns["debug_keywords"].search(s)
-        if m_debug:
-            kw_str = m_debug.group(0)
-            findings.append(Finding(
-                id="FIRM-BACKDOOR-KW-003",
-                title="Legacy Debugging/Maintenance Keyword Found",
-                description=f"A raw reference keyword tracking to diagnostic developer shortcuts ('{kw_str}') was confirmed active in binary instructions.",
-                severity="High",
-                cwes=["CWE-489", "CWE-912"],
-                evidence=s[:120].strip(),
-                offset=addr_str,
-                component="debug_interface"
-            ))
+    def run(self, firmware_path: str) -> List[Finding]:
+        return []

@@ -1,103 +1,98 @@
 import math
 import re
 from typing import List, Dict, Any
-import os
+from firm_lens.utils.string_extractor import StringExtractor
 from firm_lens.utils.findings import Finding
 
 class SecretsAnalyzer:
     """
-    Optimized High-Density Secrets & Key Entropy Analyzer.
-    Uses a fast single-pass frequency algorithm to isolate cryptographic assets.
+    Advanced Secrets and Cryptographic Key Extraction Engine.
+    Scans extracted application data strings for high-entropy tokens, 
+    embedded private keys, and credential assignment patterns.
     """
-    def __init__(self):
-        # Focus on explicit target patterns that won't pollute string extractor scans
+    def __init__(self, min_string_length: int = 4):
+        self.extractor = StringExtractor(min_length=min_string_length)
+        
+        # Real-world target assignments found in unstripped code or credential configs
         self.signatures = {
-            "WiFi SSID Marker": r"WIFI_SSID",
-            "WiFi Password Marker": r"WIFI_PASS",
-            "NVS Reference": r"nvs"
+            "PEM_Private_Key": re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----"),
+            "Generic_Secret_Assignment": re.compile(r"(?i)\b(api_key|passwd|password|secret|auth_token)\s*[:=]\s*['\"][A-Za-z0-9_\-]+['\"]")
         }
 
-    def _fast_entropy(self, data: bytes) -> float:
-        """Calculates Shannon Entropy in a single linear pass (O(N))."""
-        if not data: 
+    def _calculate_string_entropy(self, text: str) -> float:
+        """Calculates Shannon Entropy of a specific text string to evaluate token randomness."""
+        if not text:
             return 0.0
-        length = len(data)
-        counts = [0] * 256
-        for byte in data:
-            counts[byte] += 1
+        length = len(text)
+        frequencies = {}
+        for char in text:
+            frequencies[char] = frequencies.get(char, 0) + 1
         
         entropy = 0.0
-        for count in counts:
-            if count > 0:
-                p = count / length
-                entropy -= p * math.log2(p)
+        for count in frequencies.values():
+            p = count / length
+            entropy -= p * math.log2(p)
         return entropy
 
     def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
-        findings = []
-        content = firmware_map.get("raw_binary", b"")
+        findings: List[Finding] = []
+        raw_data = firmware_map.get("raw_binary", b"")
 
-        if not content and os.path.exists(firmware_path):
-            try:
-                with open(firmware_path, "rb") as f:
-                    content = f.read()
-            except OSError:
-                pass
+        if not raw_data:
+            return findings
 
-        if not content:
-            return []
-
-        # 1. Optimized Block Entropy Scanner (Avoids hanging on large 4MB dumps)
-        window_size = 128
-        step_size = 64  # Increased step to optimize performance while maintaining coverage
-        
-        for i in range(0, len(content) - window_size, step_size):
-            window = content[i:i+window_size]
-            entropy = self._fast_entropy(window)
+        try:
+            # Leverage your optimized string layer to bypass raw assembly instructions
+            strings = self.extractor.extract_from_bytes(raw_data)
             
-            # High-density entropy check (typically indicates raw private keys or embedded binaries)
-            if entropy > 7.7:  
+            high_entropy_tokens_count = 0
+            first_token_offset = None
+
+            for offset, found_str in strings:
+                cleaned_str = found_str.strip()
+                
+                # Check 1: Explicit High-Value Key Structures
+                for name, regex in self.signatures.items():
+                    if regex.search(cleaned_str):
+                        findings.append(Finding(
+                            id="FIRM-SECRET-001",
+                            title=f"Hardcoded Credential/Key Blueprint Found: '{name}'",
+                            description="An explicit credential assignment format or cryptographic key header was isolated in memory.",
+                            severity="Critical",
+                            cwes=["CWE-798", "CWE-312"],
+                            evidence=cleaned_str[:80],
+                            offset=hex(offset),
+                            component="firmware_data"
+                        ))
+
+                # Check 2: High-Entropy Token Isolation (Bases, Hashes, API Tokens)
+                # If a short string string contains no spaces and high randomness, it's likely a token
+                if 16 <= len(cleaned_str) <= 64 and " " not in cleaned_str:
+                    string_entropy = self._calculate_string_entropy(cleaned_str)
+                    
+                    # Base64/Hex authentication structures exhibit an internal entropy > 4.5
+                    if string_entropy > 4.5:
+                        high_entropy_tokens_count += 1
+                        if first_token_offset is None:
+                            first_token_offset = offset
+
+            # Cluster high-entropy findings to prevent report pollution
+            if high_entropy_tokens_count > 0:
                 findings.append(Finding(
                     id="FIRM-SECRET-002",
-                    title="High-Entropy Data Fragment",
-                    description="Detected a localized block of high-entropy data. Likely an obfuscated key, custom token, or localized encrypted configuration structure.",
+                    title="High-Entropy Authentication Tokens Detected",
+                    description=f"Isolated {high_entropy_tokens_count} distinct high-entropy text tokens lacking space formatting. These indicate embedded API tokens, passwords, or salts.",
                     severity="High",
-                    cwes=["CWE-312"],
-                    evidence=f"Local Entropy Density: {entropy:.2f}",
-                    offset=hex(i),
+                    cwes=["CWE-312", "CWE-798"],
+                    evidence=f"Identified {high_entropy_tokens_count} localized key targets inside string maps.",
+                    offset=hex(first_token_offset) if first_token_offset else "-",
                     component="entropy_engine"
                 ))
 
-        # 2. Pattern Matching Signature Check
-        for name, pattern in self.signatures.items():
-            matches = list(re.finditer(pattern.encode(), content))
-            if not matches: 
-                continue
+        except Exception:
+            pass
 
-            if name == "NVS Reference" and len(matches) > 5:
-                findings.append(Finding(
-                    id="FIRM-SECRET-003",
-                    title=f"Systemic {name} Usage Identified",
-                    description=f"Identified {len(matches)} structural NVS tracking references throughout the binary image map, indicating extensive programmatic usage of Non-Volatile Storage.",
-                    severity="Medium",
-                    cwes=["CWE-798"],
-                    evidence=f"Aggregated Count: {len(matches)} calls parsed.",
-                    offset=hex(matches[0].start()),
-                    component="flash_nvs"
-                ))
-            else:
-                for match in matches:
-                    findings.append(Finding(
-                        id="FIRM-SECRET-001",
-                        title=f"Hardcoded {name} Discovered",
-                        description=f"A hardcoded compiler symbol reference matching {name} rules was detected.",
-                        severity="Critical" if "Pass" in name else "Medium",
-                        cwes=["CWE-798"],
-                        evidence=match.group().decode(errors="ignore")[:64],
-                        offset=hex(match.start()),
-                        component="firmware_data"
-                    ))
         return findings
 
     def run(self, firmware_path: str) -> List[Finding]:
-        return self.run_with_map(firmware_path, {"raw_binary": b""})
+        return []
