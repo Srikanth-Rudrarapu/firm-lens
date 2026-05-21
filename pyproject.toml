@@ -17,7 +17,7 @@ dependencies = [
     "rich",
     "click",
     "pycryptodome",
-    "esptool>=4.5.0"
+    "esptool>=4.5.0",
 ]
 
 classifiers = [

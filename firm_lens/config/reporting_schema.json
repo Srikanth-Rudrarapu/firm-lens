@@ -1,0 +1,25 @@
+{
+    "domain_mappings": {
+        "Platform Architecture & Component Catalog": "Platform Architecture & Component Catalog",
+        "Hardware-Rooted Boot Integrity Assessments": "Hardware-Rooted Boot Integrity Assessments",
+        "Data-at-Rest Storage Cryptography Obfuscation": "Data-at-Rest Storage Cryptography Obfuscation",
+        "Static Cryptographic Key & Credential Escrow Checks": "Static Cryptographic Key & Credential Escrow Checks",
+        "Cryptographic Primitive Configuration Profiles": "Cryptographic Primitive Configuration Profiles",
+        "Logical Storage Layout & Boundary Integrity Audits": "Logical Storage Layout & Boundary Integrity Audits",
+        "Application Layer Information Leakage Telemetry": "Application Layer Information Leakage Telemetry",
+        "Memory Safety & Execution Control-Flow Audits": "Memory Safety & Execution Control-Flow Audits",
+        "Infrastructure Interface & Network Surface Mapping": "Infrastructure Interface & Network Surface Mapping",
+        "Unauthorized Access & Maintenance Interface Audits": "Unauthorized Access & Maintenance Interface Audits",
+        "Software Composition Analysis & Supply Chain Intel": "Software Composition Analysis & Supply Chain Intel",
+        "Physical Hardware Device Fuzzing & Interaction": "Physical Hardware Device Fuzzing & Interaction"
+    },
+    "token_id_substitutions": {
+        "FIRM-SECRET-": "FL-CRED-908B",
+        "BOOT-ERR-": "FL-BOOT-E91X",
+        "MEM-ERR-": "FL-MEMS-032E",
+        "PART-ERR-": "FL-PART-S88E",
+        "NET-IP-": "FL-NETW-BNDR",
+        "NET-URL-": "FL-NETW-SURF",
+        "FIRM-HITL-": "FL-HARD-FUZZ"
+    }
+}

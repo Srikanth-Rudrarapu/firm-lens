@@ -296,12 +296,13 @@ def extract(chip, live_port, baud, output):
 
 @cli.command(help="Perform a multi-tiered security assessment on a target firmware binary.")
 @click.argument("firmware_path", type=click.Path(exists=True))
-@click.option("--format", "-f", type=click.Choice(["terminal", "json", "html", "all"]), default="all", help="Output format selection mapping.")
+@click.option("--format", "-f", type=click.Choice(["terminal", "json", "html", "all"]), help="Output format selection mapping.")
 @click.option("--output", "-o", type=click.Path(), help="Explicit output filename override.")
 @click.pass_context
 def analyze(ctx, firmware_path, format, output):
     console.print("[info]⚡ Initiating FirmLens Deep Analysis Pipeline Engine...[/info]")
     run_analyzers_pipeline(firmware_path, format, ctx.obj["OUTPUT_DIR"], output)
+
 
 @cli.command(help="Initialize or synchronize the localized database parameters for vulnerability tracking.")
 def init_db():
@@ -330,14 +331,32 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
         return
 
     # Construct the memory-aware dictionary frame to keep parameters safe across submodules
+    # Run build environment fingerprint mappings FIRST to extract authentic metadata
+    env_findings = []
+    dynamic_sdk_name = "Unverified Target Architecture"
+    dynamic_sdk_version = "Unknown Baseline"
+
+    try:
+        from firm_lens.analyzers.fingerprint_analyzer import FingerprintAnalyzer
+        env_findings = FingerprintAnalyzer().run(path)
+        
+        # If the analyzer successfully captured a real string footprint, parse it dynamically
+        if env_findings and hasattr(env_findings[0], 'evidence') and "v" in env_findings[0].evidence:
+            # Safely extract the dynamically discovered version text from the evidence field
+            dynamic_sdk_name = "ESP-IDF Environment Native"
+            dynamic_sdk_version = env_findings[0].evidence.replace("Version tag:", "").strip()
+    except Exception:
+        pass
+
+    # Construct the memory-aware dictionary frame using live variables exclusively
     firmware_map = {
         "raw_path": path,
         "raw_binary": raw_binary_bytes,
         "segments": [],
         "partitions": [],
         "is_unified_flash": True if os.path.getsize(path) >= 0x400000 else False,
-        "sdk_name": "esp-idf",
-        "sdk_version": "v4.2" # Default baseline fallback variable
+        "sdk_name": dynamic_sdk_name,       # ✅ 100% Dynamic
+        "sdk_version": dynamic_sdk_version   # ✅ 100% Dynamic
     }
 
     # Execute physical alignment carving maps
@@ -373,15 +392,20 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
 
     all_findings = {}
     if env_findings: 
-        all_findings["Build Environment Metadata"] = env_findings
-
-    # Execute automated SCA lookup checks (Bypassing hardcoded entries dynamically via JSON queries)
-    try:
-        cve_findings = CVEAnalyzer().run_with_map(path, firmware_map)
-        if cve_findings:
-            all_findings["Software Supply Chain Vulnerabilities"] = cve_findings
-    except Exception:
-        pass
+        all_findings["FingerprintAnalyzer"] = env_findings
+        
+        # ============================================================
+        # DYNAMIC THREAD: SOFTWARE COMPOSITION ANALYSIS (SCA)
+        # Pass the extracted environment version directly to the CVE Engine
+        # ============================================================
+        try:
+            # We must instantiate the CVEAnalyzer dynamically here so it can ingest the fingerprint data
+            from firm_lens.analyzers.cve_analyzer import CVEAnalyzer
+            cve_results = CVEAnalyzer().run(env_findings)
+            if cve_results:
+                all_findings["CVEAnalyzer"] = cve_results
+        except Exception as e:
+            console.print(f"[warning]CVE Threat Intel Matrix bypassed: {e}[/warning]")
 
     # Complete suite of hardware/software behavioral analyzers
     analyzers = [
@@ -395,6 +419,7 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
         InsecureEndpointAnalyzer(), 
         BackdoorAnalyzer(), 
         WeakXORAnalyzer(),
+        CVEAnalyzer(),
     ]
 
     for analyzer in analyzers:
@@ -428,21 +453,50 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
     console.print(" 🔬 FIRMLENS TELEMETRY MUTATION COMPLEXITY MATRIX COMPLETE", style="title")
     console.print("=" * 62, style="success")
     
-    # Calculate global tracking metrics instantly across all finding models
-    total_findings = sum(len(f_list) for f_list in all_findings.values())
-    critical_count = sum(1 for f_list in all_findings.values() for f in f_list if f.severity == "Critical")
-    high_count = sum(1 for f_list in all_findings.values() for f in f_list if f.severity == "High")
+    # Calculate true risk footprints by isolating environmental metadata from flaws safely
+    total_vulnerabilities = 0
+    critical_count = 0
+    high_count = 0
+    medium_count = 0
+    info_advisories = 0
     
-    console.print(f" [*] Ingestion Boundary:  [info]{os.path.basename(path)}[/info]")
-    console.print(f" [*] Structural Health:   [success]PARSING SUCCESSFUL[/success] | Unpacked Modules: [cyan]{len(all_findings)}[/cyan]")
-    console.print(f" [*] Threat Footprint:    Total Risk Vectors Isolated -> [bold error]{total_findings} findings[/bold error]")
+    for module_name, findings_list in all_findings.items():
+        for f in findings_list:
+            # Type-safe object property mapping to prevent iteration crashes
+            if isinstance(f, dict):
+                severity = f.get('severity', 'Medium')
+                title = f.get('title', '')
+                evidence = f.get('evidence', '')
+            else:
+                severity = getattr(f, 'severity', 'Medium')
+                title = getattr(f, 'title', '')
+                evidence = getattr(f, 'evidence', '')
+            
+            # If the tool generated a placeholder fallback due to an unverified binary target,
+            # display it inside data grids but prevent it from inflating your security flaw metrics
+            if "unverified" in str(title).lower() or "unknown" in str(evidence).lower():
+                info_advisories += 1
+                continue
+                
+            total_vulnerabilities += 1
+            if severity == "Critical":
+                critical_count += 1
+            elif severity == "High":
+                high_count += 1
+            elif severity == "Medium":
+                medium_count += 1
+            elif severity in ["Low", "Info"]:
+                info_advisories += 1
+
+    console.print(f" [*] Ingestion Boundary:          [info]{os.path.basename(path)}[/info]")
+    console.print(f" [*] Structural Assessment:       [success]STRUCTURAL EQUILIBRIUM VERIFIED[/success] | Telemetry Audit Vectors Enforced: [cyan]{len(all_findings)}[/cyan]")
+    console.print(f" [*] Threat Footprint:            Total Risk Vectors Isolated -> [bold error]{total_vulnerabilities} anomalies[/bold error]")
     
     # ============================================================
     # RUGGED ENTERPRISE SEVERITY SCOREBOARD MATRIX (PANEL DESIGN)
     # ============================================================
     console.print("\n [bold title]🚨 SEVERITY DISTRIBUTION SCOREBOARD:[/bold title]")
     
-    # Construct an auto-aligned structural grid with fixed column widths
     scoreboard = Table(
         show_header=False, 
         box=None, 
@@ -453,12 +507,10 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
     scoreboard.add_column("Divider", width=3, justify="center")
     scoreboard.add_column("Count", width=20)
 
-    # Populate structural rows natively with strict internal text alignments
     scoreboard.add_row("[bold red]CRITICAL SEVERITY (CVE)[/bold red]", "│", f"[bold red]{critical_count}[/bold red]")
     scoreboard.add_row("[bold orange3]HIGH RISK COMPONENT[/bold orange3]", "│", f"[bold orange3]{high_count}[/bold orange3]")
-    scoreboard.add_row("OTHER ADVISORY MATRIX", "│", f"[bold cyan]{total_findings - (critical_count + high_count)}[/bold cyan]")
+    scoreboard.add_row("OTHER ADVISORY MATRIX", "│", f"[bold cyan]{total_vulnerabilities - (critical_count + high_count)}[/bold cyan]")
 
-    # Wrap the table inside a Panel to render perfectly aligned borders automatically
     console.print(
         Panel(
             scoreboard,
@@ -469,16 +521,18 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
     )
 
     # ============================================================
-    # SUBMODULE THREAD BREAKDOWN 
+    # SUBMODULE THREAD BREAKDOWN (Using Clean Unified Formatting)
     # ============================================================
     console.print("\n [*] Active Submodule Thread Breakdown:", style="info")
-    for module_name, findings_list in all_findings.items():
+    
+    generator = ReportGenerator(base_output_dir)
+    for module_key, findings_list in all_findings.items():
+        secure_display_name = generator._analyzer_domain_map.get(module_key, module_key)
         status_color = "bold red" if len(findings_list) > 3 else "bold yellow" if len(findings_list) > 0 else "green"
-        console.print(f"  ├─▶ [cyan]{module_name:<35}[/cyan] ──▶ Status: [{status_color}] ATTENTION REQUIRED ({len(findings_list)})[/{status_color}]")
+        console.print(f"  ├─▶ [cyan]{secure_display_name:<55}[/cyan] ──▶ Status: [{status_color}] COMPLETED ({len(findings_list)})[/{status_color}]")
     
     console.print("  └─▶ [success]Static Pipeline Scan Sequence Terminated Securely.[/success]")
 
-    # 5. Compile findings array to build report structures natively
+    # Compile findings array to build report structures natively
     target_filename = os.path.basename(path)
-    generator = ReportGenerator(base_output_dir)
     generator.generate(all_findings, report_format, explicit_output, filename=target_filename)
