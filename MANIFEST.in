@@ -1,0 +1,12 @@
+# Include source and data files
+recursive-include firm_lens *.py
+recursive-include firm_lens *.db
+recursive-include firm_lens *.json
+
+# Exclude junk files
+global-exclude .DS_Store
+global-exclude *.pyc
+global-exclude __pycache__
+
+# Exclude the samples directory (No trailing slash for Windows compatibility)
+prune samples
