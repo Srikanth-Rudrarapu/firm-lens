@@ -293,14 +293,16 @@ def extract(chip, live_port, baud, output):
     click.secho(f"✔ Real hardware flash stream acquired successfully: {output}", fg="green", bold=True)
     click.secho("✔ Ingestion complete: Component layout generated and mapped cleanly.", fg="green")
 
-
 @cli.command(help="Perform a multi-tiered security assessment on a target firmware binary.")
 @click.argument("firmware_path", type=click.Path(exists=True))
-@click.option("--format", "-f", type=click.Choice(["terminal", "json", "html", "all"]), help="Output format selection mapping.")
-@click.option("--output", "-o", type=click.Path(), help="Explicit output filename override.")
+@click.option("--format", "-f", type=click.Choice(["json", "html", "all"]), help="Generate additional file reports.")
+@click.option("--output", "-o", type=click.Path(), help="Explicit output path.")
 @click.pass_context
 def analyze(ctx, firmware_path, format, output):
     console.print("[info]⚡ Initiating FirmLens Deep Analysis Pipeline Engine...[/info]")
+    
+    # Always run the pipeline (which prints to terminal)
+    # Pass the format ONLY if the user wants file outputs
     run_analyzers_pipeline(firmware_path, format, ctx.obj["OUTPUT_DIR"], output)
 
 

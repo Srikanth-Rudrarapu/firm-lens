@@ -7,6 +7,7 @@ from typing import Dict, List, Any
 from rich.console import Console
 from rich.table import Table
 from rich.theme import Theme
+from pathlib import Path
 
 class ReportGenerator:
     """
@@ -80,25 +81,23 @@ class ReportGenerator:
 
 
     def _abstract_offset(self, raw_offset: Any) -> str:
-        """
-        Transforms raw byte addresses into architectural firmware segments
-        to enhance technical description complexity for O-1 file requirements.
-        """
         try:
             if not raw_offset or raw_offset == "-":
                 return "System Metric Boundary"
+
             val = int(raw_offset, 16) if isinstance(raw_offset, str) and raw_offset.startswith("0x") else int(raw_offset)
-            
+
             if val == 0x1000:
-                return "0x00001000 [Core Bootloader Sector]"
+                return f"0x1000 [Core Bootloader Sector]"
             elif 0x8000 <= val <= 0xA000:
-                return f"0x{val:08X} [Partition Configuration Registry]"
+                return f"0x{val:X} [Partition Configuration Registry]"
             elif val < 0x10000:
-                return f"0x{val:08X} [Internal Vendor ROM Boundary]"
+                return f"0x{val:X} [Internal Vendor ROM Boundary]"
             elif 0x10000 <= val <= 0x1F0000:
-                return f"0x{val:08X} [Application Execution Kernel Linker Space]"
+                return f"0x{val:X} [Application Execution Kernel Linker Space]"
             else:
-                return f"0x{val:08X} [Non-Volatile Flash Data Allocation Pool]"
+                return f"0x{val:X} [Non-Volatile Flash Data Allocation Pool]"
+
         except Exception:
             return str(raw_offset)
 
@@ -127,12 +126,13 @@ class ReportGenerator:
 
         return secure_id, secure_evidence
 
-    def generate(self, results: Dict[str, List[Any]], fmt: str = "terminal", explicit_path: str = None, filename: str = "firmware.bin"):
-        """Orchestrates report generation safely translating keys to secure domains."""
+
+    def generate(self, results: Dict[str, List[Any]], fmt: str = None, explicit_path: str = None, filename: str = "firmware.bin"):
+        """Orchestrates report generation, separating terminal display from file outputs."""
         sanitized_results = {}
         
+        # 1. Prepare sanitized data
         for analyzer, findings in results.items():
-            # Translate raw class strings into compliance domains instantly at the gate
             secure_domain = self._analyzer_domain_map.get(analyzer, "General Security Operational Audits")
             sanitized_findings = []
             
@@ -140,11 +140,10 @@ class ReportGenerator:
                 f_id, severity, f_title, cwes, evidence, offset = self._extract_fields(f)
                 secure_id, secure_ev = self._sanitize_telemetry(f_id, f_title, evidence)
                 
-                # Apply updates straight to references to support all data types
                 if isinstance(f, dict):
                     f["id"] = secure_id
                     f["evidence"] = secure_ev
-                    f["analyzer"] = secure_domain  # Force inner reference override
+                    f["analyzer"] = secure_domain
                 else:
                     setattr(f, "id", secure_id)
                     setattr(f, "evidence", secure_ev)
@@ -153,37 +152,46 @@ class ReportGenerator:
                 
             sanitized_results[secure_domain] = sanitized_findings
 
-        # Dispatch generation tracks using transformed domains exclusively
+        # 2. ALWAYS display results in the terminal
         self._generate_terminal(sanitized_results)
 
-        formats_to_gen = ["json", "html"] if fmt == "all" else [fmt]
-        for f in formats_to_gen:
-            if f == "terminal":
-                continue
-            try:
-                target_path = self._resolve_path(explicit_path, f)
-                if f == "json":
-                    self._generate_json(sanitized_results, target_path, filename)
-                elif f == "html":
-                    self._generate_html(sanitized_results, target_path, filename)
-            except Exception as e:
-                self.console.print(f"[error]❌ File generation pipeline failed for format '{f}': {str(e)}[/error]")
+        # 3. ONLY generate files if 'fmt' is provided (not None)
+        if fmt:
+            formats_to_gen = ["json", "html"] if fmt == "all" else [fmt]
+            for f in formats_to_gen:
+                try:
+                    # Pass the filename here so it is used for naming the report
+                    target_path = self._resolve_path(explicit_path, f, filename)
+                    
+                    if f == "json":
+                        self._generate_json(sanitized_results, target_path, filename)
+                    elif f == "html":
+                        self._generate_html(sanitized_results, target_path, filename)
+                except Exception as e:
+                    self.console.print(f"[error]❌ File generation pipeline failed for format '{f}': {str(e)}[/error]")
 
-    def _resolve_path(self, explicit_path: str, extension: str) -> str:
-        """Ensures correct file extensions and handles directory creation paths safely."""
+
+    def _resolve_path(self, explicit_path: str, extension: str, original_filename: str) -> str:
+        """Saves reports using firmware name + timestamp."""
+        
+        # 1. Handle explicit paths
         if explicit_path:
             if not explicit_path.lower().endswith(f".{extension}"):
-                resolved = f"{explicit_path}.{extension}"
-            else:
-                resolved = explicit_path
-            parent_dir = os.path.dirname(os.path.abspath(resolved))
-            os.makedirs(parent_dir, exist_ok=True)
-            return resolved
+                return f"{explicit_path}.{extension}"
+            return explicit_path
         
+        # 2. Extract the name without the extension (e.g., 'full_flash.bin' -> 'full_flash')
+        base_name = os.path.splitext(original_filename)[0]
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        session_dir = os.path.join(self.base_dir, f"audit_{timestamp}")
-        os.makedirs(session_dir, exist_ok=True)
-        return os.path.join(session_dir, f"security_report.{extension}")
+        
+        # 3. Default to Downloads directory
+        home_dir = os.path.expanduser("~")
+        save_dir = os.path.join(home_dir, "Downloads", "FirmLens_Reports")
+        os.makedirs(save_dir, exist_ok=True)
+        
+        # Format: firmware_name_timestamp.ext
+        return os.path.join(save_dir, f"{base_name}_{timestamp}.{extension}")
+
 
     def _get_severity_color(self, severity: str) -> str:
         """Maps severity levels to Rich terminal colors."""

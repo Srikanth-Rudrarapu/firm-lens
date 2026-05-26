@@ -26,7 +26,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Topic :: Security",
     "Topic :: Software Development :: Embedded Systems",
-    "Topic :: System :: Firmware"
 ]
 
 [project.scripts]
