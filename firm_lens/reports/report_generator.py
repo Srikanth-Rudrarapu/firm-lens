@@ -196,7 +196,7 @@ class ReportGenerator:
     def _get_severity_color(self, severity: str) -> str:
         """Maps severity levels to Rich terminal colors."""
         mapping = {
-            "Critical": "bold red", "High": "red", "Medium": "yellow", "Low": "blue", "Info": "cyan"
+            "Critical": "bold red", "High": "red", "Medium": "yellow", "Low": "green", "Info": "cyan"
         }
         return mapping.get(str(severity), "white")
 
