@@ -44,11 +44,7 @@ class InsecureEndpointAnalyzer:
         except Exception:
             pass
 
-        # ============================================================
-        # CLEAN COMPONENT RETURN (REMOVED REDUNDANT INFO BLOCK)
-        # ============================================================
-        # We stripped the 'if not partitions:' findings.append logic 
-        # to guarantee flawless dashboard scoreboard synchronization.
+        # Empty severity findings are filtered out.
 
         return findings
 

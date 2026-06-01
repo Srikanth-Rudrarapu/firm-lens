@@ -11,7 +11,7 @@ class StringExtractor:
     def __init__(self, min_length: int = 4):
         self.min_length = min_length
         # Pre-compile the pattern to process binary data streams at the native C-level.
-        # This matches printable ASCII characters ranging from space (0x20) to tilde (0x7E).
+        # Matches printable ASCII characters ranging from space (0x20) to tilde (0x7E).
         self.pattern = re.compile(rb'[\x20-\x7E]{' + str(min_length).encode() + rb',}')
 
     def extract_from_bytes(self, data: bytes) -> List[Tuple[int, str]]:
@@ -32,7 +32,7 @@ class StringExtractor:
             offset = match.start()
             match_bytes = match.group()
             
-            # Optimization: avoid computing decoding logic on long streams of identical 
+            # Avoiding computing decoding logic on long streams of identical 
             # repetitive padding bytes (e.g., long sequences of spaces or filler characters)
             if len(match_bytes) > 64 and len(set(match_bytes)) < 4:
                 continue

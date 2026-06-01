@@ -42,7 +42,7 @@ class WeakXORAnalyzer:
                     offset=offset,
                     component="app"
                 ))
-                break # Single warning per asset prevents dashboard explosion
+                break # Single warning per asset to prevent dashboard explosion
         return findings
 
     def _looks_like_xor(self, chunk: bytes) -> bool:

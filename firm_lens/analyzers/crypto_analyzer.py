@@ -68,10 +68,6 @@ class CryptoAnalyzer:
                 )
                 start = idx + 1
 
-        # ============================================================
-        # CLEAN COMPONENT RETURN (REMOVED DUMMY INFO INJECTION)
-        # ============================================================
-        # We completely removed the 'if not findings:' block to prevent
-        # artificial scoreboard inflation. If the list is empty, it stays empty
+         # Empty severity findings are filtered out.
 
         return findings

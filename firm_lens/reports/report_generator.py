@@ -168,7 +168,7 @@ class ReportGenerator:
                     elif f == "html":
                         self._generate_html(sanitized_results, target_path, filename)
                 except Exception as e:
-                    self.console.print(f"[error]❌ File generation pipeline failed for format '{f}': {str(e)}[/error]")
+                    self.console.print(f"[error] File generation pipeline failed for format '{f}': {str(e)}[/error]")
 
 
     def _resolve_path(self, explicit_path: str, extension: str, original_filename: str) -> str:
@@ -295,6 +295,7 @@ class ReportGenerator:
         critical_count = 0
         high_count = 0
         medium_count = 0
+        low_count = 0
         info_count = 0
         
         for findings_list in results.values():
@@ -321,7 +322,9 @@ class ReportGenerator:
                     high_count += 1
                 elif severity == "Medium":
                     medium_count += 1
-                elif severity in ["Low", "Info"]:
+                elif severity == "Low":
+                    low_count += 1
+                elif severity in ["Info"]:
                     info_count += 1
                     
         return {
@@ -329,6 +332,7 @@ class ReportGenerator:
             "critical_count": critical_count,
             "high_count": high_count,
             "medium_count": medium_count,
+            "low_count": low_count,
             "info_count": info_count
         }
 
@@ -392,10 +396,11 @@ class ReportGenerator:
                 "telemetry_audit_vectors_enforced": len(results),
                 "total_security_anomalies_isolated": metrics["total_findings"],
                 "severity_distribution_scoreboard": {
-                    "critical_severity": metrics["critical_count"],
-                    "high_risk": metrics["high_count"],
-                    "medium_risk": metrics["medium_count"],
-                    "other_advisories": metrics["info_count"]
+                    "Critical": metrics["critical_count"],
+                    "High": metrics["high_count"],
+                    "Medium": metrics["medium_count"],
+                    "Low": metrics["low_count"],
+                    "Info": metrics["info_count"]
                 }
             },
             "findings": []
@@ -440,7 +445,7 @@ class ReportGenerator:
 
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=4)
-        self.console.print(f"[success]✔ Structured JSON Security Report Compiled and Successfully Saved to:[/success] {path}")
+        self.console.print(f"[success]Structured JSON Security Report Compiled and Successfully Saved to:[/success] {path}")
 
     def _generate_html(self, results: Dict[str, List[Any]], path: str, filename: str):
         """Generates an obfuscated HTML report masking raw python tags from all tables."""
@@ -453,12 +458,13 @@ class ReportGenerator:
             .container { max-width: 1200px; margin: auto; }
             .header-card { background: #1e293b; color: white; border-radius: 12px; padding: 30px; margin-bottom: 25px; }
             
-            .dashboard-row { display: grid; grid-template-columns: repeat(5, 1fr); gap: 15px; margin-bottom: 25px; }
+            .dashboard-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 15px; margin-bottom: 25px; }
             .metric-card { background: white; border-radius: 10px; padding: 18px; box-shadow: 0 4px 6px rgba(0,0,0,0.02); border-top: 4px solid #cbd5e1; }
             .metric-card.total { border-top-color: #6366f1; }
             .metric-card.critical { border-top-color: #ef4444; }
             .metric-card.high { border-top-color: #f97316; }
             .metric-card.medium { border-top-color: #eab308; }
+            .metric-card.low { border-top-color: #10b981; }
             .metric-card.info { border-top-color: #06b6d4; }
             .metric-title { font-size: 0.72rem; text-transform: uppercase; color: #64748b; font-weight: 700; letter-spacing: 0.05em; }
             .metric-value { font-size: 1.6rem; font-weight: 700; margin-top: 5px; color: #1e293b; }
@@ -508,6 +514,7 @@ class ReportGenerator:
                     else if (severity === 'Critical' && rowSev === 'Critical') isMatch = true;
                     else if (severity === 'High' && rowSev === 'High') isMatch = true;
                     else if (severity === 'Medium' && rowSev === 'Medium') isMatch = true;
+                    else if (severity === 'Low' && rowSev === 'Low') isMatch = true;
                     else if (severity === 'Info' && (rowSev === 'Low' || rowSev === 'Info')) isMatch = true;
 
                     if (isMatch) {
@@ -548,7 +555,7 @@ class ReportGenerator:
         <html>
         <head>
             <meta charset="utf-8">
-            <title>🛡️ {escaped_filename} - Report</title>
+            <title>{escaped_filename} - Report</title>
             {css}
             {script}
         </head>
@@ -564,6 +571,7 @@ class ReportGenerator:
                     <button class='f-btn' onclick="filterBySeverity('Critical', this)">Critical</button>
                     <button class='f-btn' onclick="filterBySeverity('High', this)">High</button>
                     <button class='f-btn' onclick="filterBySeverity('Medium', this)">Medium</button>
+                    <button class='f-btn' onclick="filterBySeverity('Low', this)">Low</button>
                     <button class='f-btn' onclick="filterBySeverity('Info', this)">Info</button>
                 </div>
             </div>
@@ -584,6 +592,10 @@ class ReportGenerator:
                 <div class='metric-card medium'>
                     <div class='metric-title'>Medium</div>
                     <div class='metric-value' style='color: #eab308;'>{metrics['medium_count']}</div>
+                </div>
+                <div class='metric-card low'>
+                    <div class='metric-title'>Low</div>
+                    <div class='metric-value' style='color: #10b981;'>{metrics['low_count']}</div>
                 </div>
                 <div class='metric-card info'>
                     <div class='metric-title'>Info</div>
@@ -615,7 +627,7 @@ class ReportGenerator:
 
                     box_class = "passport-box" if rem_type == "PASSPORT" else ""
                     title_class = "passport-title" if rem_type == "PASSPORT" else ""
-                    title_label = "🛡️ Security Verification Passport:" if rem_type == "PASSPORT" else "🛡️ Actionable Engineering Remediation Blueprint:"
+                    title_label = "Security Verification Passport:" if rem_type == "PASSPORT" else "Actionable Engineering Remediation Blueprint:"
                     btn_label = "View Verification" if rem_type == "PASSPORT" else "View Fix"
 
                     row_id = f"row_{row_counter}"
@@ -662,4 +674,4 @@ class ReportGenerator:
 
         with open(path, "w", encoding="utf-8") as f:
             f.write(html_start + content + "</div></body></html>")
-        self.console.print(f"[success]✔ Interactive HTML Security Report Compiled and Successfully Saved to:[/success] {path}")
+        self.console.print(f"[success]Interactive HTML Security Report Compiled and Successfully Saved to:[/success] {path}")

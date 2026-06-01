@@ -22,7 +22,7 @@ class ESP32FirmwareParser:
                 if offset >= size:
                     return b""
                 
-                # CRITICAL FIX: Reset the file cursor to the requested offset before reading
+                # Reset the file cursor to the requested offset before reading
                 f.seek(offset) 
                 return f.read(min(length, size - offset))
         except Exception:

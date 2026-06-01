@@ -28,8 +28,7 @@ class CVEAnalyzer:
     def run(self, environment_findings: Any) -> List[Finding]:
         cve_findings = []
         
-        # [CRITICAL FIX 1] Type Safety Guard. 
-        # Prevents crashing if the main execution loop accidentally feeds this module a string.
+        # Type Safety Guard - Prevents crashing if the main execution loop accidentally feeds this module a string.
         if not isinstance(environment_findings, list):
             return cve_findings
 
@@ -45,8 +44,7 @@ class CVEAnalyzer:
                 if not hasattr(f, 'title') or not isinstance(f.title, str):
                     continue
 
-                # [CRITICAL FIX 2] Data Normalization.
-                # Converts "Detected ESP-IDF SDK Core Layer" -> "ESP-IDF" to match the database exactly.
+                #  Data Normalization - Converts "Detected ESP-IDF SDK Core Layer" -> "ESP-IDF" to match the database exactly.
                 extracted_name = f.title.replace("Detected ", "").replace(" SDK", "").strip()
                 sdk_name = extracted_name.split()[0] 
                 

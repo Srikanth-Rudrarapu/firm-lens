@@ -22,11 +22,7 @@ class ESP32PartitionAnalyzer:
         if not partitions and raw_data:
             partitions = self._deep_carve_flash_space(raw_data)
 
-        # ============================================================
-        # CLEAN COMPONENT RETURN (REMOVED REDUNDANT INFO BLOCK)
-        # ============================================================
-        # We stripped the 'if not partitions:' findings.append logic 
-        # to guarantee flawless dashboard scoreboard synchronization.
+       # Empty severity findings are filtered out.
             return findings
 
         labels = {str(p.get("name", "")).strip().lower() for p in partitions}

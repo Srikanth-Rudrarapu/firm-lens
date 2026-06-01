@@ -7,8 +7,8 @@ from typing import Dict, Any
 def initialize_vulnerability_db():
     """
     100% Dynamic Software Composition Analysis (SCA) Synchronizer.
-    Queries the official public GitHub Advisory API anonymously by default
-    to generate a clean, un-hardcoded local vulnerability index cache.
+    Queries the official public GitHub Advisory API by default
+    to generate a clean local vulnerability index cache.
     """
     target_dir = os.path.join("firm_lens", "utils")
     db_filename = "vulnerability_db.json"
@@ -60,7 +60,7 @@ def initialize_vulnerability_db():
             for version_info in advisory.get("vulnerabilities", []):
                 v_range = version_info.get("vulnerable_version_range", "")
                 
-                # Dynamic translation rules to map API scopes to our fingerprinter tags
+                # Dynamic translation rules to map API scopes to fingerprinter tags
                 target_version = "v4.2" 
                 if "4.3" in v_range: target_version = "v4.3"
                 if "5.0" in v_range: target_version = "v5.0"

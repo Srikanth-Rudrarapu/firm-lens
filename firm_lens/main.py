@@ -142,7 +142,7 @@ EXAMPLES:\n
   Standard Pass:       firm-lens extract --chip esp32 --live-port /dev/cu.usbserial-0001 -o workspace.bin\n
   Auto-Detect Mode:    firm-lens extract --chip esp32 -o workspace.bin\n
   Fully Automated:     firm-lens extract\n\n
-💡 DEFAULT OUTPUT ROUTING:\n
+  DEFAULT OUTPUT ROUTING:\n
   If the --output flag is omitted, the framework dynamically targets the executing machine's native User Downloads folder path location:\n "{get_default_downloads_path()}"
 """
 )
@@ -162,7 +162,7 @@ EXAMPLES:\n
 @click.option(
     '--baud', '-b',
     type=click.INT,
-    default=460800,
+    default=115200,
     show_default=True,
     help="Serial transport package data transmission speed rate."
 )
@@ -172,126 +172,74 @@ EXAMPLES:\n
     default=None,
     help="Destination file path where the carved firmware image bin container file will be written. [Default: ~/Downloads/hardware_extracted_flash.bin]"
 )
+
+
 def extract(chip, live_port, baud, output):
     """Execution pathway for bare-metal hardware flash extraction."""
     
-    # 1. INTERACTIVE WIZARD & GUIDE (Triggered if user drops in without setting specific options)
+    # 1. INTERACTIVE WIZARD
     if live_port is None and output is None:
         target_output = get_default_downloads_path()
-        
         console.print("\n[bold title] FirmLens Hardware Extraction Assistant[/bold title]")
         console.print("[gray]-------------------------------------------------------------[/gray]")
         console.print("You launched the extraction module in [bold cyan]Auto-Wizard Mode[/bold cyan].")
-        console.print(f" • [bold info]Target Architecture Profile:[/] {chip.upper()}")
-        console.print(f" • [bold info]Target Transmission Speed:[/]   {baud} baud")
-        console.print(f" • [bold info]Automated Flash Auto-Save Destination:[/]")
-        console.print(f"   [success]{target_output}[/success]\n")
+        console.print(f" • [bold info]Target Architecture Profile:[/bold info] {chip.upper()}")
+        console.print(f" • [bold info]Target Transmission Speed:[/bold info] {baud} baud")
+        console.print(f" • [bold info]Automated Flash Auto-Save Destination:[/]\n   [success]{target_output}[/success]\n")
         
-        console.print("[bold warning] QUICK GUIDE FOR NEW USERS:[/bold warning]")
-        console.print("  1. Ensure your ESP32 board is plugged into this machine via a data-capable USB cable.")
-        console.print("  2. If the tool is unable to establish a link, press and hold the physical [bold yellow]BOOT[/bold yellow] button")
-        console.print("     on the board while the tool prints 'Opening active physical link...'.\n")
-        
-        # Safe confirmation check before performing automated actions
         if not click.confirm(click.style("Would you like to proceed with Automated Port Discovery & Extraction?", fg="yellow", bold=True), default=True):
-            click.secho("Operation canceled by user. Exiting safely.", fg="red")
+            click.secho("Operation canceled.", fg="red")
             sys.exit(0)
 
-    # 2. HANDLE DYNAMIC DEFAULT OUTPUT PATH CONFIGURATION
+    # 2. PATH CONFIGURATION
     if output is None:
         output = get_default_downloads_path()
         
-    # Ensure the parent directory path exists securely
-    parent_dir = os.path.dirname(os.path.abspath(output))
-    os.makedirs(parent_dir, exist_ok=True)
+    os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
 
-    # 3. SMART AUTO-DISCOVERY FALLBACK INTERACTION CONTROL
+    # 3. AUTO-DISCOVERY FALLBACK
     if live_port is None:
-        click.secho("\n Live port flag omitted. Initializing physical USB interface auto-discovery layer...", fg="cyan")
         discovered = auto_discover_ports()
-        
         if not discovered:
-            click.secho("Error: No active USB-to-Serial hardware devices detected on this machine.", fg="red", bold=True)
-            click.secho("Action required: Please ensure your ESP32 board is firmly plugged in via a data-capable USB cable.", fg="yellow")
+            click.secho("Error: No active USB-to-Serial hardware devices detected.", fg="red", bold=True)
             sys.exit(1)
-            
         if len(discovered) == 1:
             live_port = discovered[0]
-            click.secho(f"Auto-Selected Active Interface Node: {live_port}", fg="green", bold=True)
+            click.secho(f"Auto-Selected Interface: {live_port}", fg="green", bold=True)
         else:
-            click.secho("Multiple virtual serial ports discovered on your platform:", fg="yellow", bold=True)
-            for p in discovered:
-                click.secho(f"  ▶  {p}", fg="cyan")
-            click.secho("\nAction required: Re-run the command specifying one of the ports above using the --live-port flag.", fg="yellow")
+            click.secho("Multiple ports discovered. Re-run specifying --live-port.", fg="yellow", bold=True)
             sys.exit(0)
 
-    # 4. INITIALIZE HARDWARE LINK COUPLING LOGS
-    click.secho(f"Opening active physical link on port {live_port} ({baud} baud)...", fg="green")
-    click.secho(f"Targeting output target destination: {output}", fg="cyan")
-    sys.stdout.flush()
-
-    # 5. AUTHENTIC EXTRACTION COUPLING VIA ESPTOOL SUBPROCESS STREAMING
+    # 4. EXECUTION
+    click.secho(f"Opening physical link on {live_port} ({baud} baud)...", fg="green")
+    
     import subprocess
+    esptool_cmd = [
+        sys.executable, "-m", "esptool",
+        "--chip", str(chip).lower(),
+        "--port", str(live_port),
+        "--baud", str(baud),
+        "read-flash", "0", "ALL",
+        str(output)
+    ]
+    
     try:
-        click.echo()
-        click.secho(f"Initializing bare-metal flash memory space carving sequence...", fg="yellow")
-        
-        # Build the exact command execution array to invoke esptool natively
-        esptool_cmd = [
-            sys.executable, "-m", "esptool",
-            "--chip", str(chip).lower(),
-            "--port", str(live_port),
-            "--baud", str(baud),
-            "read-flash",  # Clean hyphenated command parameter
-            "0", "ALL",
-            str(output)
-        ]
-        
         result = subprocess.run(esptool_cmd, stdout=sys.stdout, stderr=sys.stderr, text=True)
         
-        # INTEGLLIGENT HARDWARE ERROR INTERCEPT MATRIX
         if result.returncode != 0:
-            click.echo()
-            click.secho("=" * 70, fg="red", bold=True)
-            click.secho("CRITICAL HARDWARE EXTRACTION STREAM FAULT DETECTED", fg="red", bold=True)
-            click.secho("=" * 70, fg="red", bold=True)
-            
-            # If the current run used the high default baud rate, warn the user explicitly
+            click.secho("\n" + "="*70, fg="red", bold=True)
+            click.secho("HARDWARE EXTRACTION FAULT DETECTED", fg="red", bold=True)
             if baud > 115200:
-                click.secho("\n DIAGNOSTIC ANALYSIS:", fg="yellow", bold=True)
-                click.secho(f"The serial transmission link collapsed mid-stream while running at a high speed ({baud} baud).", fg="cyan")
-                click.secho("This is almost always caused by physical electrical noise, an unshielded USB cable, or a hub.", fg="cyan")
-                
-                click.secho("\n ACTIONABLE ENGINEERING REMEDIATION:", fg="green", bold=True)
-                click.secho("Re-run the extraction command forcing a stabilized, low-impedance industry baseline speed:", fg="white")
-                click.secho(f"firm-lens extract --baud 115200\n", fg="green", bold=True)
-            else:
-                click.secho("\n DIAGNOSTIC ANALYSIS:", fg="yellow", bold=True)
-                click.secho("The connection timed out or failed to communicate even at baseline speeds.", fg="cyan")
-                click.secho("Please verify your ESP32 dev board is fully powered, and ensure you are using a USB Data cable.", fg="cyan")
-                
-            click.secho("=" * 70, fg="red", bold=True)
+                click.secho("Diagnostic: High-speed sync failure. Attempt manual stabilization:", fg="cyan")
+                click.secho(f"firm-lens extract --baud 115200", fg="green", bold=True)
+            click.secho("="*70, fg="red", bold=True)
             sys.exit(1)
 
     except Exception as e:
-        click.secho(f"Critical hardware bus execution fault detected: {str(e)}", fg="red", bold=True)
-        sys.exit(1)
-        
-        # Execute the hardware dump pass, forwarding stdout directly to the terminal screen
-        # This keeps the genuine esptool progress graphics bar active without buffering freezes!
-        result = subprocess.run(esptool_cmd, stdout=sys.stdout, stderr=sys.stderr, text=True)
-        
-        if result.returncode != 0:
-            click.secho("\n Error: Hardware flash carving operation aborted or failed mid-stream.", fg="red", bold=True)
-            sys.exit(1)
-
-    except Exception as e:
-        click.secho(f"Critical hardware bus execution fault detected: {str(e)}", fg="red", bold=True)
+        click.secho(f"Critical execution fault: {str(e)}", fg="red", bold=True)
         sys.exit(1)
 
-    click.echo()
-    click.secho(f"Real hardware flash stream acquired successfully: {output}", fg="green", bold=True)
-    click.secho("Ingestion complete: Component layout generated and mapped cleanly.", fg="green")
+    click.secho(f"\nFlash stream acquired successfully: {output}", fg="green", bold=True)
 
 @cli.command(help="Perform a multi-tiered security assessment on a target firmware binary.")
 @click.argument("firmware_path", type=click.Path(exists=True))

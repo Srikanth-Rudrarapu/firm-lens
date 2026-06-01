@@ -23,7 +23,7 @@ class DangerousFunctionAnalyzer:
             "memcpy": {"severity": "Medium", "cwe": "CWE-119", "desc": "Memory block transfer requiring rigorous runtime size assertions."}
         }
         
-        # Real-world optimization: Pre-compiled regex patterns for symbol matching
+        # Pre-compiled regex patterns for symbol matching
         self.patterns = {
             func: re.compile(rf"\b{func}\b")
             for func in self.dangerous_funcs
@@ -37,7 +37,7 @@ class DangerousFunctionAnalyzer:
             return findings
 
         try:
-            # STRATEGY 1: SCAN COPIED LINKER SYMBOLS AND BULLETINS VIA STRINGS
+            # SCAN COPIED LINKER SYMBOLS AND BULLETINS VIA STRINGS
             strings = self.extractor.extract_from_bytes(raw_data)
             for offset, found_str in strings:
                 for func, rx in self.patterns.items():
@@ -49,7 +49,7 @@ class DangerousFunctionAnalyzer:
                         findings.append(self._create_finding(func, meta, offset, f"Symbol reference text string verified: '{found_str}'"))
                         break
 
-            # STRATEGY 2: HARDWARE-LEVEL HEURISTIC (GENUINE EMBEDDED FALLBACK)
+            # HARDWARE-LEVEL HEURISTIC
             # If the binary is optimized or stripped, we look for standard compiled format string 
             # vulnerabilities (like plain '%s' format tokens embedded immediately near functional logic spaces)
             if not findings:
@@ -58,11 +58,7 @@ class DangerousFunctionAnalyzer:
         except Exception:
             pass
 
-        # ============================================================
-        # CLEAN COMPONENT RETURN (REMOVED DUMMY INFO INJECTION)
-        # ============================================================
-        # We completely removed the 'if not findings:' block to prevent
-        # artificial scoreboard inflation. If the list is empty, it stays empty
+       # Empty severity findings are filtered out.
 
         return findings
 

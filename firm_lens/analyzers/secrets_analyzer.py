@@ -13,7 +13,7 @@ class SecretsAnalyzer:
     def __init__(self, min_string_length: int = 4):
         self.extractor = StringExtractor(min_length=min_string_length)
         
-        # Real-world target assignments found in unstripped code or credential configs
+        # Target assignments found in unstripped code or credential configs
         self.signatures = {
             "PEM_Private_Key": re.compile(r"-----BEGIN[A-Z ]*PRIVATE KEY-----"),
             "Generic_Secret_Assignment": re.compile(r"(?i)\b(api_key|passwd|password|secret|auth_token)\s*[:=]\s*['\"][A-Za-z0-9_\-]+['\"]")
@@ -42,7 +42,7 @@ class SecretsAnalyzer:
             return findings
 
         try:
-            # Leverage your optimized string layer to bypass raw assembly instructions
+            # Leverage optimized string layer to bypass raw assembly instructions
             strings = self.extractor.extract_from_bytes(raw_data)
             
             high_entropy_tokens_count = 0
