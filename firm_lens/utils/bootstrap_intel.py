@@ -1,64 +1,86 @@
 import os
+import gzip
 import sqlite3
+import requests
+from datetime import datetime
 
-def bootstrap_vulnerabilities_db():
+CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+EPSS_DATA_URL = "https://epss.empiricalsecurity.com/epss_scores-current.csv.gz"
+
+def sync_global_threat_feeds():
     """
-    Relational Threat Intelligence Bootstrap Engine.
-    Synthesizes an indexed SQLite database containing validated CVE mappings
-    for the ESP-IDF component stack to support local offline SCA verification.
+    Connects to authoritative global security endpoints, streams active exploitation metrics,
+    and updates the local relational SQLite cache. Employs memory-isolated streams and 
+    atomic batch database transactions to fulfill enterprise performance requirements.
     """
-    # Dynamically locate the data folder one level above the utils directory
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    target_dir = os.path.normpath(os.path.join(base_dir, "..", "data"))
+    # Dynamically locate vulnerabilities.db inside the data sibling directory
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    db_path = os.path.join(base_dir, "data", "vulnerabilities.db")
     
-    if not os.path.exists(target_dir):
-        os.makedirs(target_dir)
+    if not os.path.exists(db_path):
+        raise FileNotFoundError(f"Local database matrix skeleton not initialized at: {db_path}")
 
-    db_path = os.path.join(target_dir, "vulnerabilities.db")
-    print(f"[*] Bootstrapping relational threat intelligence matrix at: {db_path}")
-
+    # 1. INGEST AUTHORITY CISA KEV CATALOG LIVE FEED
     try:
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Build clean schema index matching fields queried by CVEAnalyzer
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS vulnerabilities (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                component_name TEXT NOT NULL,
-                affected_version TEXT NOT NULL,
-                cve_id TEXT NOT NULL,
-                severity TEXT NOT NULL,
-                cwe_id TEXT NOT NULL,
-                description TEXT NOT NULL
-            )
-        """)
-
-        # Seed data matching specific library signatures isolated by the parser
-        vulnerability_seed = [
-            ("ESP-IDF", "4.2", "CVE-2021-28150", "Critical", "CWE-120", 
-             "Heap-based buffer overflow in the Wi-Fi core stack allows remote attackers to trigger kernel panics or achieve arbitrary instruction execution via malformed standard wireless frames."),
-            ("ESP-IDF", "4.3", "CVE-2022-35921", "High", "CWE-295", 
-             "Improper verification of upstream SSL certificate chains allows local man-in-the-middle (MitM) traffic interception during critical network configuration updates."),
-            ("MbedTLS", "2.16", "CVE-2020-35631", "High", "CWE-327", 
-             "Side-channel timing vulnerability in modular multiplication routines allows cryptographic attackers to recover private ECC validation keys via hardware power monitoring analysis."),
-            ("FreeRTOS", "10.2", "CVE-2021-31571", "Critical", "CWE-190", 
-             "Integer overflow vulnerability within the memory allocator abstraction layer allows system kernel execution control manipulation primitives.")
-        ]
-
-        # Inject parameter bindings cleanly
-        cursor.executemany("""
-            INSERT INTO vulnerabilities (component_name, affected_version, cve_id, severity, cwe_id, description)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, vulnerability_seed)
-
-        conn.commit()
-        conn.close()
-        print("[+] Threat intelligence initialization complete. Database catalog successfully locked down.")
-        return True
+        cisa_response = requests.get(CISA_KEV_URL, timeout=15)
+        cisa_response.raise_for_status()
+        cisa_data = cisa_response.json()
+        active_kev_cves = {v["cveID"] for v in cisa_data.get("vulnerabilities", [])}
     except Exception as e:
-        print(f"[-] Database synthesis failure: {str(e)}")
-        return False
+        raise ConnectionError(f"CISA Threat Ingestion Boundary communication failure: {str(e)}")
 
-if __name__ == "__main__":
-    bootstrap_vulnerabilities_db()
+    # 2. INGEST COMPRESSED FIRST.org EPSS COEFFICIENT MATRIX STREAM
+    try:
+        epss_response = requests.get(EPSS_DATA_URL, timeout=30, stream=True)
+        epss_response.raise_for_status()
+        
+        # Decompress the gzipped raw network byte chunk stream directly in volatile memory
+        decompressed_data = gzip.decompress(epss_response.content).decode("utf-8")
+    except Exception as e:
+        raise ConnectionError(f"FIRST.org EPSS Mass Data stream decompression failure: {str(e)}")
+
+    # 3. CONNECT TO RELATIONAL LAYER & EXECUTE ATOMIC INTERSECTION MATCHING
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    # Identify exactly which CVEs our firmware environment mapping table currently holds
+    cursor.execute("SELECT cve_id FROM cve_cwe_mapping")
+    monitored_cves = {row[0] for row in cursor.fetchall()}
+    
+    sync_timestamp = datetime.now().isoformat()
+    bulk_insertion_pool = []
+
+    # Parse through the raw mass EPSS CSV stream array line-by-line
+    # Row layout matches: cve,epss,percentile
+    for line in decompressed_data.splitlines():
+        if line.startswith("#") or line.startswith("cve"):
+            continue
+        
+        segments = line.split(",")
+        if len(segments) >= 2:
+            cve_id = segments[0].strip()
+            
+            # If the public vulnerability intersects with our monitored ESP32 firmware modules, cache it
+            if cve_id in monitored_cves:
+                try:
+                    epss_score = float(segments[1].strip())
+                    kev_flag = 1 if cve_id in active_kev_cves else 0
+                    bulk_insertion_pool.append((cve_id, epss_score, kev_flag, sync_timestamp))
+                except ValueError:
+                    continue
+
+    # 4. EXECUTE ATOMIC SQLITE UPDATE TRANSACTION BOUNDARY
+    if bulk_insertion_pool:
+        try:
+            cursor.executemany("""
+                INSERT OR REPLACE INTO threat_intel_cache (cve_id, epss_score, kev_status, last_synced)
+                VALUES (?, ?, ?, ?)
+            """, bulk_insertion_pool)
+            conn.commit()
+            return len(bulk_insertion_pool)
+        except sqlite3.Error as e:
+            conn.rollback()
+            raise sqlite3.DatabaseError(f"Relational telemetry update transaction rejected: {str(e)}")
+    
+    conn.close()
+    return 0

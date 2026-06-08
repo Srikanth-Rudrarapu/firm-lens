@@ -1,20 +1,23 @@
 import os
 import sys
-import time
+from datetime import datetime
+import json
 import click
+import sqlite3
 from rich.console import Console
 from rich.theme import Theme
 from rich.panel import Panel
+import rich.box
+from rich.table import Table
 import serial.tools.list_ports
+from pathlib import Path
 
 # Core Extractor Framework
 from firm_lens.extractor.esp32_extractor import ESP32Extractor
-from firm_lens.extractor.stm32_extractor import STM32Extractor
 
 # Centralized Findings and Object Utilities
 from firm_lens.utils.findings import Finding
-from firm_lens.utils.file_type import FileTypeDetector
-from firm_lens.utils.zip_firmware_extractor import ZipFirmwareExtractor
+from firm_lens.utils.rules_loader import load_centralized_analyzer_rules 
 
 # Synchronous Component Analyzer Suites
 from firm_lens.analyzers.secure_boot_analyzer import SecureBootAnalyzer
@@ -33,6 +36,13 @@ from firm_lens.analyzers.cve_analyzer import CVEAnalyzer
 # Reporting and Native Package Branding
 from firm_lens.reports.report_generator import ReportGenerator
 from firm_lens.banner import BANNER
+
+#Dynamic HIL
+from firm_lens.dynamic.serial_monitor import FirmLensHILMonitor
+from firm_lens.dynamic.fuzzer_uart import UARTFuzzer
+from firm_lens.dynamic.crash_parser import CrashParser
+from firm_lens.dynamic.fuzzer_wifi import WiFiFuzzer
+
 
 # ============================================================
 # RICH INTERFACE THEME CONFIGURATION
@@ -53,7 +63,6 @@ console = Console(
     record=True
 )
 
-# Custom formatting engines to protect help documentation layout across displays
 class FirmLensHelpFormatter(click.HelpFormatter):
     def write_text(self, text):
         self.write(text)
@@ -64,9 +73,6 @@ class FirmLensCLICommandGroup(click.Group):
         self.format_help(ctx, formatter)
         return formatter.getvalue()
 
-# ============================================================
-# MASTER CLICK COMMAND LINE INTERFACE CONTROL
-# ============================================================
 @click.group(
     cls=FirmLensCLICommandGroup,
     invoke_without_command=True,
@@ -90,25 +96,22 @@ def cli(ctx, output_dir):
         console.print("  • Run [bold cyan]'firm-lens analyze <BINARY_PATH>'[/bold cyan] to audit a firmware file.")
         console.print("  • Run [bold cyan]'firm-lens --help'[/bold cyan] to access the complete operational guide.\n")
 
-# ============================================================
-# UTILITY HELPER SCHEMAS FOR EXTRACTION
-# ============================================================
 def auto_discover_ports() -> list:
-    """Helper utility to scan system hardware layers for active USB-Serial bridges."""
     ports = serial.tools.list_ports.comports()
     return [p.device for p in ports if "usb" in p.device.lower() or "ttyusb" in p.device.lower() or "cu.usbserial" in p.device.lower()]
 
+
 def get_default_downloads_path() -> str:
-    """Dynamically resolves the host machine's native user Downloads directory."""
     home_dir = os.path.expanduser("~")
     downloads_dir = os.path.join(home_dir, "Downloads")
+    
+    # Generate a unique timestamp for the filename
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    unique_filename = f"hardware_extracted_flash_{timestamp}.bin"
+    
     if not os.path.exists(downloads_dir):
-        return os.path.abspath("hardware_extracted_flash.bin")
-    return os.path.join(downloads_dir, "hardware_extracted_flash.bin")
-
-# ============================================================
-# FRAMEWORK COMMAND MODULES
-# ============================================================
+        return os.path.abspath(unique_filename)
+    return os.path.join(downloads_dir, unique_filename)
 
 @cli.command(help="List all active heuristic analyzers and core security target areas.")
 def categories():
@@ -126,153 +129,207 @@ def categories():
         console.print(f"  • [bold cyan]{cat:<25}[/bold cyan] {desc}")
     console.print()
 
-
-@cli.command(
-    name="extract",
-    help=f"""
-Extract raw firmware binary images from physically connected Espressif SoC chips over serial interfaces.
-
-This tool establishes an automated hardware-level handshake sequence with the target chip's ROM Bootloader, negotiates flash size parameters, and pulls down the complete memory layout.
-
-PLATFORM NODE SCHEMAS:\n
-  Mac (Zsh/Bash):      /dev/cu.usbserial-XXXX or /dev/cu.wlan-debug\n
-  Linux (Ubuntu/Deb):  /dev/ttyUSBX or /dev/ttyAMUX (Ensure user is in 'dialout' group)\n
-  Windows (PowerShell): COM3, COM4, etc.\n\n
-EXAMPLES:\n
-  Standard Pass:       firm-lens extract --chip esp32 --live-port /dev/cu.usbserial-0001 -o workspace.bin\n
-  Auto-Detect Mode:    firm-lens extract --chip esp32 -o workspace.bin\n
-  Fully Automated:     firm-lens extract\n\n
-  DEFAULT OUTPUT ROUTING:\n
-  If the --output flag is omitted, the framework dynamically targets the executing machine's native User Downloads folder path location:\n "{get_default_downloads_path()}"
-"""
-)
-@click.option(
-    '--chip', '-c',
-    type=click.Choice(['esp32', 'esp32s2', 'esp32s3', 'esp32c3'], case_sensitive=False),
-    default='esp32',
-    show_default=True,
-    help='Target micro-controller chip system hardware architecture profile.'
-)
-@click.option(
-    '--live-port', '-p',
-    type=click.STRING,
-    default=None,
-    help="The virtual serial device node communication interface connection path. (Omit to trigger Auto-Discovery Mode)."
-)
-@click.option(
-    '--baud', '-b',
-    type=click.INT,
-    default=115200,
-    show_default=True,
-    help="Serial transport package data transmission speed rate."
-)
-@click.option(
-    '--output', '-o',
-    type=click.Path(writable=True),
-    default=None,
-    help="Destination file path where the carved firmware image bin container file will be written. [Default: ~/Downloads/hardware_extracted_flash.bin]"
-)
-
-
+@cli.command(name="extract", help="Extract raw firmware binary images from physically connected Espressif SoC chips.")
+@click.option('--chip', '-c', type=click.Choice(['esp32', 'esp32s2', 'esp32s3', 'esp32c3'], case_sensitive=False), default='esp32', show_default=True)
+@click.option('--live-port', '-p', type=click.STRING, default=None)
+@click.option('--baud', '-b', type=click.INT, default=115200, show_default=True)
+@click.option('--output', '-o', type=click.Path(writable=True), default=None)
 def extract(chip, live_port, baud, output):
-    """Execution pathway for bare-metal hardware flash extraction."""
-    
-    # 1. INTERACTIVE WIZARD
     if live_port is None and output is None:
         target_output = get_default_downloads_path()
         console.print("\n[bold title] FirmLens Hardware Extraction Assistant[/bold title]")
         console.print("[gray]-------------------------------------------------------------[/gray]")
-        console.print("You launched the extraction module in [bold cyan]Auto-Wizard Mode[/bold cyan].")
-        console.print(f" • [bold info]Target Architecture Profile:[/bold info] {chip.upper()}")
-        console.print(f" • [bold info]Target Transmission Speed:[/bold info] {baud} baud")
-        console.print(f" • [bold info]Automated Flash Auto-Save Destination:[/]\n   [success]{target_output}[/success]\n")
-        
-        if not click.confirm(click.style("Would you like to proceed with Automated Port Discovery & Extraction?", fg="yellow", bold=True), default=True):
-            click.secho("Operation canceled.", fg="red")
+        if not click.confirm(click.style("Would you like to proceed with Automated Extraction?", fg="yellow", bold=True), default=True):
             sys.exit(0)
 
-    # 2. PATH CONFIGURATION
     if output is None:
         output = get_default_downloads_path()
         
     os.makedirs(os.path.dirname(os.path.abspath(output)), exist_ok=True)
 
-    # 3. AUTO-DISCOVERY FALLBACK
     if live_port is None:
         discovered = auto_discover_ports()
         if not discovered:
             click.secho("Error: No active USB-to-Serial hardware devices detected.", fg="red", bold=True)
             sys.exit(1)
-        if len(discovered) == 1:
-            live_port = discovered[0]
-            click.secho(f"Auto-Selected Interface: {live_port}", fg="green", bold=True)
-        else:
-            click.secho("Multiple ports discovered. Re-run specifying --live-port.", fg="yellow", bold=True)
-            sys.exit(0)
+        live_port = discovered[0]
 
-    # 4. EXECUTION
-    click.secho(f"Opening physical link on {live_port} ({baud} baud)...", fg="green")
-    
     import subprocess
-    esptool_cmd = [
-        sys.executable, "-m", "esptool",
-        "--chip", str(chip).lower(),
-        "--port", str(live_port),
-        "--baud", str(baud),
-        "read-flash", "0", "ALL",
-        str(output)
-    ]
-    
+    esptool_cmd = [sys.executable, "-m", "esptool", "--chip", str(chip).lower(), "--port", str(live_port), "--baud", str(baud), "read-flash", "0", "ALL", str(output)]
     try:
         result = subprocess.run(esptool_cmd, stdout=sys.stdout, stderr=sys.stderr, text=True)
-        
         if result.returncode != 0:
-            click.secho("\n" + "="*70, fg="red", bold=True)
-            click.secho("HARDWARE EXTRACTION FAULT DETECTED", fg="red", bold=True)
-            if baud > 115200:
-                click.secho("Diagnostic: High-speed sync failure. Attempt manual stabilization:", fg="cyan")
-                click.secho(f"firm-lens extract --baud 115200", fg="green", bold=True)
-            click.secho("="*70, fg="red", bold=True)
             sys.exit(1)
-
     except Exception as e:
         click.secho(f"Critical execution fault: {str(e)}", fg="red", bold=True)
         sys.exit(1)
 
-    click.secho(f"\nFlash stream acquired successfully: {output}", fg="green", bold=True)
+
+# HIL dynamic fuzzing commands
+@cli.command(name="dynamic", help="Launch Hardware-in-the-Loop (HIL) dynamic fuzzing against a live ESP32.")
+@click.option('--live-port', '-p', type=click.STRING, default=None, help="Serial port for UART monitoring/fuzzing.")
+@click.option('--baud', '-b', type=click.INT, default=115200, show_default=True)
+@click.option('--target-ip', '-t', type=click.STRING, default=None, help="IP address for Network fuzzing.")
+@click.option('--format', '-f', 'report_format', type=click.Choice(['json', 'html', 'all']), default=None, help="Report output format (e.g., html, json).")
+@click.option('--output', '-o', type=click.Path(), default=None, help="Directory to save reports. Defaults to Downloads/FirmLens_Reports/Dynamic.")
+def dynamic_audit(live_port, baud, target_ip, report_format, output):
+    console.print("[info]\nInitiating FirmLens Dynamic HIL Engine...[/info]")
+    
+    target_name = target_ip.replace('.', '_') if target_ip else "uart_hil"
+    base_name = f"dynamic_audit_{target_name}"
+
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, "data", "vulnerabilities.db")
+
+    # Ensure Threat Intel Database Exists Before Scanning
+    if not os.path.exists(db_path):
+        console.print("\n[warning]Local Threat Intelligence Database not found.[/warning]")
+        console.print("[info]FirmLens requires a localized copy of the latest CVE/EPSS mappings to generate accurate reports.[/info]")
+        console.print("Please run the following command to initialize and sync the database:")
+        console.print("\n    [bold cyan]firm-lens init-db[/bold cyan]\n")
+        sys.exit(1)
+    
+    # 1. Enforce Dynamic subfolder and parse filename vs directory
+    if output is None:
+        out_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'FirmLens_Reports', 'Dynamic')
+    else:
+        if output.endswith(('/', '\\')) or os.path.isdir(output):
+            out_dir = output
+        else:
+            out_path = Path(output)
+            out_dir = str(out_path.parent)
+            base_name = out_path.name
+            
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+    
+    if live_port is None:
+        discovered = auto_discover_ports()
+        if not discovered:
+            click.secho("Error: No active USB-to-Serial hardware devices detected.", fg="red", bold=True)
+            sys.exit(1)
+        live_port = discovered[0]
+
+    console.print(f"[success]Hardware locked on {live_port} at {baud} baud.[/success]")
+    
+    hil_engine = FirmLensHILMonitor(port=live_port, baudrate=baud)
+    if not hil_engine.connect():
+        sys.exit(1)
+
+    hil_engine.start()
+
+    # Create a professional display name for the report
+    display_asset_name = f"Live ESP32 Target ({target_ip})" if target_ip else "Live ESP32 Target (UART Interconnect)"
+
+    try:
+        if target_ip:
+            console.print(f"[info]Network Target Provided. Engaging Wi-Fi Fuzzer...[/info]")
+            fuzzer = WiFiFuzzer(target_ip=target_ip, crash_event=hil_engine.crash_detected)
+        else:
+            console.print(f"[info]No IP Provided. Engaging Local UART Fuzzer...[/info]")
+            fuzzer = UARTFuzzer(hil_engine.serial_conn, hil_engine.crash_detected)
+            
+        fuzzer.run()
+        
+        if hil_engine.crash_detected.is_set():
+            console.print("\n[bold red]!!! HARDWARE FAULT DETECTED !!![/bold red]")
+            
+            parser = CrashParser()
+            results = parser.parse_log(hil_engine.crash_log)
+            
+            console.print(f"[error]Vulnerability:[/error] {results.get('cwe', 'CWE-120')}")
+            console.print(f"[error]Severity:[/error]      {results.get('severity', 'CRITICAL')}")
+            console.print(f"[error]Fault Type:[/error]    {results.get('fault_type', 'Hardware Exception')}")
+            console.print(f"[error]Crash Address:[/error] {results.get('instruction_pointer', 'Unknown')}")
+            console.print(f"[error]Evidence:[/error]      {results.get('evidence', 'Hardware crash triggered via fuzzing.')}")
+            
+            dynamic_finding = Finding(
+                id="FL-DYN-01",
+                title=f"Catastrophic Hardware Fault: {results.get('fault_type', 'Hardware Exception')}",
+                cwes=[results.get('cwe', 'CWE-120: Buffer Overflow / CWE-134: Format String')],
+                severity=results.get('severity', 'CRITICAL'),
+                offset=results.get('instruction_pointer', 'Unknown'),
+                evidence=results.get('evidence', 'Hardware crash triggered via fuzzing.')
+            )
+            dynamic_finding.remediation_blueprint = "Implement strict memory bounds checking. Utilize safe string handling (e.g., strncpy, snprintf) and sanitize all network/serial buffer inputs before passing to execution contexts."
+            
+            aggregated_findings = {
+                "Physical Hardware Device Fuzzing & Interaction": [dynamic_finding]
+            }
+            
+            # Pass the parsed out_dir and base_name to the generator
+            generator = ReportGenerator(out_dir)
+            generator.generate(aggregated_findings, report_format, out_dir, filename=base_name, asset_name=display_asset_name)
+
+        else:
+            console.print("\n[success]Fuzzing complete. Target device remained stable.[/success]")
+            
+    except KeyboardInterrupt:
+        console.print("\n[warning]Dynamic analysis manually aborted.[/warning]")
+    finally:
+        hil_engine.stop()
+
 
 @cli.command(help="Perform a multi-tiered security assessment on a target firmware binary.")
 @click.argument("firmware_path", type=click.Path(exists=True))
-@click.option("--format", "-f", type=click.Choice(["json", "html", "all"]), help="Generate additional file reports.")
-@click.option("--output", "-o", type=click.Path(), help="Explicit output path.")
-@click.pass_context
-def analyze(ctx, firmware_path, format, output):
+@click.option("--format", "-f", 'report_format', type=click.Choice(["json", "html", "all"]), default=None, help="Generate additional file reports (e.g., html, json).")
+@click.option("--output", "-o", type=click.Path(), default=None, help="Explicit output path or filename. Defaults to Downloads/FirmLens_Reports/Static.")
+def analyze(firmware_path, report_format, output):
     console.print("[info]\nInitiating FirmLens Deep Analysis Pipeline Engine...[/info]")
     
-    # Always run the pipeline (which prints to terminal)
-    # Pass the format ONLY if the user wants file outputs
-    run_analyzers_pipeline(firmware_path, format, ctx.obj["OUTPUT_DIR"], output)
+    target_filename = os.path.basename(firmware_path)
+    base_name = target_filename
+
+    # Ensure Threat Intel Database Exists Before Scanning
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, "data", "vulnerabilities.db")
+    
+    if not os.path.exists(db_path):
+        console.print("\n[warning]Local Threat Intelligence Database not found.[/warning]")
+        console.print("[info]FirmLens requires a localized copy of the latest CVE/EPSS mappings to generate accurate reports.[/info]")
+        console.print("Please run the following command to initialize and sync the database:")
+        console.print("\n    [bold cyan]firm-lens init-db[/bold cyan]\n")
+        sys.exit(1)
+    
+    if output is None:
+        out_dir = os.path.join(os.path.expanduser('~'), 'Downloads', 'FirmLens_Reports', 'Static')
+    else:
+        # Check if user passed a directory ending in a slash, or an existing directory
+        if output.endswith(('/', '\\')) or os.path.isdir(output):
+            out_dir = output
+        else:
+            # Treat the last part as the file name, and the rest as the directory
+            out_path = Path(output)
+            out_dir = str(out_path.parent)
+            base_name = out_path.name
+
+    if not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
+        
+    run_analyzers_pipeline(firmware_path, report_format, out_dir, base_name)
 
 
-@cli.command(help="Initialize or synchronize the localized database parameters for vulnerability tracking.")
+@cli.command(help="Initialize and synchronize the localized relational database cache with global threat feeds.")
 def init_db():
-    console.print("[info] Initializing localized vulnerability index definitions catalog...[/info]")
+    console.print("[info] Initializing localized vulnerability relational database schemas...[/info]")
     try:
         from firm_lens.data.init_intel import initialize_vulnerability_db
         initialize_vulnerability_db()
-        console.print("[success] Local database matrix synchronized successfully at: firm_lens/utils/vulnerability_db.json[/success]")
+        console.print("[success]Local database storage architecture initialized safely.[/success]")
+        
+        console.print("[info] Connecting to public security ingestion boundaries for live synchronization...[/info]")
+        from firm_lens.utils.bootstrap_intel import sync_global_threat_feeds
+        records_updated = sync_global_threat_feeds()
+        console.print(f"[success]Threat Intel Matrix updated. Cached {records_updated} live telemetry records safely inside data/vulnerabilities.db[/success]")
     except Exception as e:
-        console.print(f"[error]Database Invalidation Error: {str(e)}[/error]")
+        console.print(f"[error]Database Sync Initialization Aborted: {str(e)}[/error]")
+
 
 # ============================================================
 # MASTER DATA FLOW & CONTEXT ORCHESTRATION PIPELINE
 # ============================================================
-def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, explicit_output: str):
-    """
-    Synchronous Ingestion, Analysis, and Report Compilation Orchestrator.
-    Manages raw streams, fingerprints build flags, executes analyzers,
-    and formats findings fields cleanly for output rendering.
-    """
+# def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, explicit_output: str):
+def run_analyzers_pipeline(path: str, report_format: str, out_dir: str, base_filename: str):
     try:
         with open(path, "rb") as f:
             raw_binary_bytes = f.read()
@@ -280,24 +337,52 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
         console.print(f"[error]File Processing Fault: Unable to load data stream: {str(e)}[/error]")
         return
 
-    # Construct the memory-aware dictionary frame to keep parameters safe across submodules
-    # Run build environment fingerprint mappings FIRST to extract authentic metadata
-    env_findings = []
+    domain_map = {
+        "FingerprintAnalyzer": "Platform Architecture & Component Catalog",
+        "SecureBootAnalyzer": "Hardware-Rooted Boot Integrity Assessments",
+        "FlashEncryptionAnalyzer": "Data-at-Rest Storage Cryptography Obfuscation",
+        "SecretsAnalyzer": "Static Cryptographic Key & Credential Escrow Checks",
+        "CryptoAnalyzer": "Cryptographic Primitive Configuration Profiles",
+        "ESP32PartitionAnalyzer": "Logical Storage Layout & Boundary Integrity Audits",
+        "AppStringAnalyzer": "Application Layer Information Leakage Telemetry",
+        "DangerousFunctionAnalyzer": "Memory Safety & Execution Control-Flow Audits",
+        "InsecureEndpointAnalyzer": "Infrastructure Interface & Network Surface Mapping",
+        "BackdoorAnalyzer": "Unauthorized Access & Maintenance Interface Audits",
+        "WeakXORAnalyzer": "Static Obfuscation & Data Masking Vulnerabilities",
+        "CVEAnalyzer": "Software Composition Analysis & Supply Chain Intel"
+    }
+
+    raw_findings_pool = []
     dynamic_sdk_name = "Unverified Target Architecture"
     dynamic_sdk_version = "Unknown Baseline"
 
+    # ============================================================
+    # 1. BASELINE ENVIRONMENT FINGERPRINT INGESTION BOUNDARY
+    # ============================================================
     try:
-        env_findings = FingerprintAnalyzer().run(path)
-        
-        # If the analyzer successfully captured a real string footprint, parse it dynamically
-        if env_findings and hasattr(env_findings[0], 'evidence') and "v" in env_findings[0].evidence:
-            # Safely extract the dynamically discovered version text from the evidence field
-            dynamic_sdk_name = "ESP-IDF Environment Native"
-            dynamic_sdk_version = env_findings[0].evidence.replace("Version tag:", "").strip()
+        env_prints = FingerprintAnalyzer().run(path)
+        if env_prints:
+            for f in env_prints:
+                f.component = domain_map.get("FingerprintAnalyzer", "Platform Architecture & Component Catalog")
+                if hasattr(f, 'evidence') and "v" in f.evidence:
+                    dynamic_sdk_name = "ESP-IDF Environment Native"
+                    dynamic_sdk_version = f.evidence.replace("Version tag:", "").strip()
+            raw_findings_pool.extend(env_prints)
+            
+            cve_prints = CVEAnalyzer().run(env_prints)
+            if cve_prints:
+                for f in cve_prints:
+                    f.component = domain_map.get("CVEAnalyzer", "Software Composition Analysis & Supply Chain Intel")
+                raw_findings_pool.extend(cve_prints)
+        else:
+            raw_findings_pool.append(Finding(
+                id="FL-FINGER-SDK",
+                evidence="Forensics Warning: Application compilation symbols are fully stripped.",
+                component=domain_map.get("FingerprintAnalyzer")
+            ))
     except Exception:
         pass
 
-    # Construct the memory-aware dictionary frame using live variables exclusively
     firmware_map = {
         "raw_path": path,
         "raw_binary": raw_binary_bytes,
@@ -308,220 +393,237 @@ def run_analyzers_pipeline(path: str, report_format: str, base_output_dir: str, 
         "sdk_version": dynamic_sdk_version   
     }
 
-    # Execute physical alignment carving maps
     try:
         extractor = ESP32Extractor()
         extracted_map = extractor.extract(path)
         if extracted_map:
             firmware_map.update(extracted_map)
-            if "raw_binary" not in firmware_map or not firmware_map["raw_binary"]:
-                firmware_map["raw_binary"] = raw_binary_bytes
-    except Exception as e:
-        console.print(f"[warning]Structural layout carver bypassed, running raw memory heuristics fallback: {e}[/warning]")
-
-    # Run build environment fingerprint mappings
-    env_findings = []
-    try:
-        env_findings = FingerprintAnalyzer().run(path)
     except Exception:
         pass
-        
-    if not env_findings:
-        # Guarantee baseline tracking remains visible if symbols are fully stripped
-        env_findings = [Finding(
-            id="FIRM-FINGER-001",
-            title="Detected ESP-IDF SDK Core Layer",
-            description="Identified core IoT build framework metadata using fallback environment matching.",
-            severity="Info",
-            cwes=[],
-            evidence="Version tag: v4.2",
-            offset="-",
-            component="metadata"
-        )]
 
-    all_findings = {}
-    if env_findings: 
-        all_findings["FingerprintAnalyzer"] = env_findings
-        
-        # ============================================================
-        # DYNAMIC THREAD: SOFTWARE COMPOSITION ANALYSIS (SCA)
-        # Pass the extracted environment version directly to the CVE Engine
-        # ============================================================
-        try:
-            # Instantiating the CVEAnalyzer dynamically here so it can ingest the fingerprint data
-            
-            cve_results = CVEAnalyzer().run(env_findings)
-            if cve_results:
-                all_findings["CVEAnalyzer"] = cve_results
-        except Exception as e:
-            console.print(f"[warning]CVE Threat Intel Matrix bypassed: {e}[/warning]")
-
-    # Complete suite of hardware/software behavioral analyzers
+    # ============================================================
+    # 2. ACTIVE HARDWARE & COMPONENT AUDIT LOOPS
+    # ============================================================
     analyzers = [
-        SecureBootAnalyzer(), 
-        FlashEncryptionAnalyzer(), 
-        SecretsAnalyzer(),
-        CryptoAnalyzer(), 
-        ESP32PartitionAnalyzer(), 
-        AppStringAnalyzer(),
-        DangerousFunctionAnalyzer(), 
-        InsecureEndpointAnalyzer(), 
-        BackdoorAnalyzer(), 
-        WeakXORAnalyzer(),
-        CVEAnalyzer(),
+        SecureBootAnalyzer(), FlashEncryptionAnalyzer(), SecretsAnalyzer(),
+        CryptoAnalyzer(), ESP32PartitionAnalyzer(), AppStringAnalyzer(),
+        DangerousFunctionAnalyzer(), InsecureEndpointAnalyzer(), BackdoorAnalyzer(), 
+        WeakXORAnalyzer()
     ]
 
     for analyzer in analyzers:
         name = analyzer.__class__.__name__
         try:
-            if hasattr(analyzer, "run_with_map"):
-                results = analyzer.run_with_map(path, firmware_map)
-            else:
-                results = analyzer.run(path)
-                
+            results = analyzer.run_with_map(path, firmware_map) if hasattr(analyzer, "run_with_map") else analyzer.run(path)
             if results:
-                all_findings[name] = results
+                for f in results:
+                    f.component = domain_map.get(name, "General Security Audits")
+                    raw_findings_pool.append(f)
+        except Exception:
+            pass
+
+    # ============================================================
+    # 3. STRICT ID-BASED ROLLUP DEDUPLICATION ENGINE
+    # ============================================================
+    # deduped_registry = {}
+    # for f in raw_findings_pool:
+    #     # Group strictly by Vulnerability/Rule ID to consolidate matching rows
+    #     dedup_key = str(f.id).strip().upper()
+    #     if dedup_key not in deduped_registry:
+    #         deduped_registry[dedup_key] = f
+    #         f.tracked_offsets = {str(f.offset).strip()}
+            
+    #         # Cleanly extract trailing matched string signatures from raw evidence labels
+    #         clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
+    #         f.tracked_evidence = {clean_ev}
+    #     else:
+    #         target_f = deduped_registry[dedup_key]
+    #         target_f.tracked_offsets.add(str(f.offset).strip())
+    #         clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
+    #         target_f.tracked_evidence.add(clean_ev)
+
+    # aggregated_pool = []
+    # for f in deduped_registry.values():
+    #     if hasattr(f, 'tracked_offsets') and len(f.tracked_offsets) > 1:
+    #         offsets_list = sorted(list(f.tracked_offsets))
+    #         if len(offsets_list) > 3:
+    #             f.offset = f"{offsets_list[0]} ... {offsets_list[-1]} ({len(offsets_list)} Locations)"
+    #         else:
+    #             f.offset = ", ".join(offsets_list)
+            
+    #         # Pack consolidated findings evidence tokens cleanly into a clear summary block
+    #         evidence_list = sorted(list(f.tracked_evidence))
+    #         if len(evidence_list) > 6:
+    #             f.evidence = f"Aggregated Telemetry: Extracted {len(offsets_list)} instances across flash memory space. Signatures include: {', '.join(evidence_list[:6])}..."
+    #         else:
+    #             f.evidence = f"Aggregated Telemetry: Extracted {len(offsets_list)} instances across flash memory space. Signatures: {', '.join(evidence_list)}"
+    #     aggregated_pool.append(f)
+
+
+    # ============================================================
+    # 3. STRICT ID-BASED ROLLUP DEDUPLICATION ENGINE
+    # ============================================================
+    deduped_registry = {}
+    for f in raw_findings_pool:
+        # Group strictly by ID to guarantee a single row per vulnerability type
+        dedup_key = str(f.id).strip().upper()
+        
+        if dedup_key not in deduped_registry:
+            deduped_registry[dedup_key] = f
+            f.tracked_offsets = {str(f.offset).strip()}
+            
+            clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
+            f.tracked_evidence = {clean_ev}
+        else:
+            target_f = deduped_registry[dedup_key]
+            target_f.tracked_offsets.add(str(f.offset).strip())
+            clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
+            target_f.tracked_evidence.add(clean_ev)
+
+    aggregated_pool = []
+    for f in deduped_registry.values():
+        if hasattr(f, 'tracked_offsets') and len(f.tracked_offsets) > 1:
+            offsets_list = sorted(list(f.tracked_offsets))
+            
+            if len(offsets_list) > 3:
+                f.offset = f"{offsets_list[0]} ... {offsets_list[-1]} ({len(offsets_list)} Locations)"
+            else:
+                f.offset = ", ".join(offsets_list)
+            
+            # --- THE FIX: DUMP ALL EVIDENCE ---
+            evidence_list = sorted(list(f.tracked_evidence))
+            # Join EVERYTHING with a newline so it formats cleanly in your scrollable HTML box
+            f.evidence = f"[{len(offsets_list)} instances]:\n" + "\n".join(evidence_list)
+                
+        aggregated_pool.append(f)
+
+
+    # ============================================================
+    # 4. DATA-LAYER ORCHESTRATION VIA RELATIONAL KNOWLEDGE MATRICES
+    # ============================================================
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    db_path = os.path.join(base_dir, "data", "vulnerabilities.db")
+    
+    static_rules = load_centralized_analyzer_rules()
+    remediations_cache = {}
+    compliance_cache = {}
+    cve_threat_telemetry = {}
+
+    if os.path.exists(db_path):
+        try:
+            with sqlite3.connect(db_path) as conn:
+                cursor = conn.cursor()
+                
+                # Extract engineers blueprints
+                cursor.execute("SELECT cwe_id, blueprint_text FROM remediations")
+                remediations_cache = {row[0].strip().upper(): row[1] for row in cursor.fetchall()}
+                
+                # Extract dynamic regulatory mappings
+                cursor.execute("SELECT cwe_id, nist_sp_800_213, etsi_en_303_645 FROM compliance_mappings")
+                for cwe, nist, etsi in cursor.fetchall():
+                    compliance_cache[cwe.strip().upper()] = {"nist": nist, "etsi": etsi}
+                
+                # Track real-world live telemetry precisely by individual CVE ID
+                cursor.execute("SELECT cve_id, epss_score, kev_status FROM threat_intel_cache")
+                for cve, epss, kev in cursor.fetchall():
+                    cve_threat_telemetry[cve.strip().upper()] = {"epss": epss, "kev": kev}
         except Exception as e:
-            all_findings[name] = [Finding(
-                id="FIRM-MOD-WARN",
-                title=f"{name} Analysis Interrupted",
-                description=f"Analysis engine module skipped execution on this binary target: {str(e)}",
-                severity="Medium",
-                cwes=[],
-                component=name
-            )]
+            console.print(f"[warning] Relational intelligence compilation bypassed: {str(e)}[/warning]")
 
     # ============================================================
-    # ENTERPRISE-GRADE HIGH-IMPACT TELEMETRY VISUALIZATION
+    # 5. POST-PROCESSING ENRICHMENT & COMPLIANCE BUCKETING
     # ============================================================
-    import rich.box
-    from rich.table import Table
-    from rich.panel import Panel
+    scoreboard = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0, "Info": 0}
+    all_findings = {}
 
+    for f in aggregated_pool:
+        f_id_upper = str(f.id).strip().upper()
+        
+        # Populate static layout configurations
+        if f_id_upper in static_rules:
+            meta = static_rules[f_id_upper]
+            f.title = meta.get("title", f.title)
+            f.description = meta.get("description", f.description)
+            
+            raw_cwes = getattr(f, "cwes", [])
+            if isinstance(raw_cwes, str): 
+                raw_cwes = [raw_cwes]
+            cleaned_cwes = [str(c).strip() for c in raw_cwes if str(c).strip() and str(c).strip() != "-"]
+            
+            if not cleaned_cwes:
+                f.cwes = meta.get("cwes", [])
+            else:
+                f.cwes = cleaned_cwes
+                
+            f.severity = meta.get("base_severity", "Medium").capitalize()
+
+        # Handle relational mappings tied strictly to the CWE weakness type
+        for cwe in f.cwes:
+            cwe_key = str(cwe).strip().upper()
+            
+            # Inject remediation blueprint text
+            if cwe_key in remediations_cache:
+                f.remediation_blueprint = remediations_cache[cwe_key]
+                
+            # Dynamically load the regulatory framework mappings from DB
+            if cwe_key in compliance_cache:
+                comp = compliance_cache[cwe_key]
+                f.threat_intelligence_telemetry["regulatory_compliance_framework_mappings"] = {
+                    "nist_sp_800_213": comp["nist"],
+                    "etsi_en_303_645": comp["etsi"]
+                }
+
+        # Isolate direct CVE identifiers to enrich with real-world threat metrics
+        potential_cve = None
+        if f_id_upper.startswith("CVE-"):
+            potential_cve = f_id_upper
+        elif hasattr(f, 'cve_id') and f.cve_id:
+            potential_cve = str(f.cve_id).strip().upper()
+
+        if potential_cve and potential_cve in cve_threat_telemetry:
+            intel = cve_threat_telemetry[potential_cve]
+            f.threat_intelligence_telemetry["epss_weaponization_probability"] = f"{intel['epss'] * 100:.2f}% (Live Threat Feed)"
+            if intel["kev"] == 1 and f.severity in ["High", "Medium"]:
+                f.severity = "Critical"
+
+        # Record changes into the active runtime scoreboard metrics
+        scoreboard[f.severity] = scoreboard.get(f.severity, 0) + 1
+        
+        # Structure the payload into proper domain components for the ReportGenerator
+        module_bucket = "General"
+        for k, v in domain_map.items():
+            if v == f.component:
+                module_bucket = k
+                break
+                
+        if module_bucket not in all_findings:
+            all_findings[module_bucket] = []
+        all_findings[module_bucket].append(f)
+
+    # ============================================================
+    # SCOREBOARD METRIC RENDERER
+    # ============================================================
     console.print("\n" + "=" * 62, style="titlelines")
-    console.print("FIRMLENS TELEMETRY MUTATION COMPLEXITY MATRIX COMPLETE", style="title")
+    console.print("FIRMLENS PIPELINE SCAN SECURITY MATRIX COMPLETE", style="title")
     console.print("=" * 62, style="titlelines")
     
-    # # Calculate true risk footprints by isolating environmental metadata from flaws safely
-    # total_vulnerabilities = 0
-    # critical_count = 0
-    # high_count = 0
-    # medium_count = 0
-    # info_advisories = 0
-    
-    # for module_name, findings_list in all_findings.items():
-    #     for f in findings_list:
-    #         # Type-safe object property mapping to prevent iteration crashes
-    #         if isinstance(f, dict):
-    #             severity = f.get('severity', 'Medium')
-    #             title = f.get('title', '')
-    #             evidence = f.get('evidence', '')
-    #         else:
-    #             severity = getattr(f, 'severity', 'Medium')
-    #             title = getattr(f, 'title', '')
-    #             evidence = getattr(f, 'evidence', '')
-            
-    #         # If the tool generated a placeholder fallback due to an unverified binary target,
-    #         # display it inside data grids but prevent it from inflating your security flaw metrics
-    #         if "unverified" in str(title).lower() or "unknown" in str(evidence).lower():
-    #             info_advisories += 1
-    #             continue
-                
-    #         total_vulnerabilities += 1
-    #         if severity == "Critical":
-    #             critical_count += 1
-    #         elif severity == "High":
-    #             high_count += 1
-    #         elif severity == "Medium":
-    #             medium_count += 1
-    #         elif severity in ["Low", "Info"]:
-    #             info_advisories += 1
+    table_board = Table(show_header=False, box=None, padding=(0, 2), expand=True)
+    table_board.add_column("Category", style="bold")
+    table_board.add_column("Count", justify="right")
 
-    # console.print(f" [*] Ingestion Boundary:          [info]{os.path.basename(path)}[/info]")
-    # console.print(f" [*] Structural Assessment:       [success]STRUCTURAL EQUILIBRIUM VERIFIED[/success] | Telemetry Audit Vectors Enforced: [cyan]{len(all_findings)}[/cyan]")
-    # console.print(f" [*] Threat Footprint:            Total Risk Vectors Isolated: [bold error]{total_vulnerabilities} Anomalies[/bold error]")
-    
-    # # ============================================================
-    # # RUGGED ENTERPRISE SEVERITY SCOREBOARD MATRIX (PANEL DESIGN)
-    # # ============================================================
-    # console.print("\n [bold title]SEVERITY DISTRIBUTION SCOREBOARD:[/bold title]")
-    
-    # scoreboard = Table(
-    #     show_header=False, 
-    #     box=None, 
-    #     padding=(0, 0),
-    #     expand=True
-    # )
-    # scoreboard.add_column("Metric", width=35)
-    # scoreboard.add_column("Divider", width=3, justify="center")
-    # scoreboard.add_column("Count", width=20)
+    for sev in ["Critical", "High", "Medium", "Low", "Info"]:
+        count = scoreboard.get(sev, 0)
+        color = "red" if sev == "Critical" else "orange3" if sev == "High" else "yellow" if sev == "Medium" else "green" if sev == "Low" else "cyan"
+        table_board.add_row(f"[bold {color}]{sev.upper()}[/bold {color}]", f"[bold {color}]{count}[/bold {color}]")
+        
+    console.print(Panel(table_board, box=rich.box.SQUARE, border_style="gray50", width=50))
 
-    # scoreboard.add_row("[bold red]CRITICAL SEVERITY (CVE)[/bold red]", "│", f"[bold red]{critical_count}[/bold red]")
-    # scoreboard.add_row("[bold orange3]HIGH RISK COMPONENT[/bold orange3]", "│", f"[bold orange3]{high_count}[/bold orange3]")
-    # scoreboard.add_row("OTHER ADVISORY MATRIX", "│", f"[bold cyan]{total_vulnerabilities - (critical_count + high_count)}[/bold cyan]")
+    # # Clean display name and prevent duplicate printing
+    # target_filename = os.path.basename(path)
+    # generator = ReportGenerator(base_output_dir)
+    # generator.generate(all_findings, report_format, explicit_output, filename=target_filename, asset_name=target_filename)
 
-    # console.print(
-    #     Panel(
-    #         scoreboard,
-    #         box=rich.box.SQUARE,
-    #         border_style="gray50",
-    #         width=62
-    #     )
-    # )
-
-    # Calculate true risk counts
-    critical_count = 0
-    high_count = 0
-    medium_count = 0
-    low_count = 0
-    info_count = 0
-    
-    for findings_list in all_findings.values():
-        for f in findings_list:
-            severity = getattr(f, 'severity', 'Medium') if not isinstance(f, dict) else f.get('severity', 'Medium')
-            
-            if severity == "Critical": critical_count += 1
-            elif severity == "High":   high_count += 1
-            elif severity == "Medium": medium_count += 1
-            elif severity == "Low":    low_count += 1
-            elif severity == "Info":   info_count += 1
-
-    # RUGGED ENTERPRISE SEVERITY SCOREBOARD MATRIX
-    console.print("\n [bold title]SEVERITY DISTRIBUTION SCOREBOARD:[/bold title]")
-    
-    scoreboard = Table(show_header=False, box=None, padding=(0, 2), expand=True)
-    scoreboard.add_column("Category", style="bold")
-    scoreboard.add_column("Count", justify="right")
-
-    # Granular breakdown for maximum transparency
-    scoreboard.add_row("[bold red]CRITICAL[/bold red]", f"[bold red]{critical_count}[/bold red]")
-    scoreboard.add_row("[bold orange3]HIGH[/bold orange3]", f"[bold orange3]{high_count}[/bold orange3]")
-    scoreboard.add_row("[bold yellow]MEDIUM[/bold yellow]", f"[bold yellow]{medium_count}[/bold yellow]")
-    scoreboard.add_row("[bold green]LOW[/bold green]", f"[bold green]{low_count}[/bold green]")
-    scoreboard.add_row("[bold cyan]INFO[/bold cyan]", f"[bold cyan]{info_count}[/bold cyan]")
-
-    console.print(
-        Panel(
-            scoreboard,
-            box=rich.box.SQUARE,
-            border_style="gray50",
-            width=50
-        )
-    )
-
-    # ============================================================
-    # SUBMODULE THREAD BREAKDOWN (Using Clean Unified Formatting)
-    # ============================================================
-    console.print("\n [*] Active Submodule Thread Breakdown:", style="info")
-    
-    generator = ReportGenerator(base_output_dir)
-    for module_key, findings_list in all_findings.items():
-        secure_display_name = generator._analyzer_domain_map.get(module_key, module_key)
-        status_color = "bold red" if len(findings_list) > 3 else "bold yellow" if len(findings_list) > 0 else "green"
-        console.print(f" ├─▶ [cyan]{secure_display_name:<55}[/cyan] ──▶ Status: [{status_color}] COMPLETED ({len(findings_list)})[/{status_color}]")
-    
-    console.print(" └─▶ [success]Static Pipeline Scan Sequence Terminated Securely.[/success]")
-
-    # Compile findings array to build report structures natively
-    target_filename = os.path.basename(path)
-    generator.generate(all_findings, report_format, explicit_output, filename=target_filename)
+    # Clean display name and prevent duplicate printing
+    target_asset_name = os.path.basename(path)
+    generator = ReportGenerator(out_dir)
+    generator.generate(all_findings, report_format, out_dir, filename=base_filename, asset_name=target_asset_name)

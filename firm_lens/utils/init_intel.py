@@ -17,7 +17,7 @@ def initialize_vulnerability_db():
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
 
-    print("[*] Connecting to the official Upstream GitHub Advisory Database API...")
+    print("Connecting to the official Upstream GitHub Advisory Database API...")
     
     api_url = "https://api.github.com/advisories"
     params = {

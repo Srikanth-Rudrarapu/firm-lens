@@ -1,0 +1,146 @@
+{
+    "FL-FINGER-SDK": {
+        "title": "Build Environment SDK Fingerprint Identified",
+        "base_severity": "Info",
+        "cwes": [],
+        "description": "Isolates plaintext software bill of materials (SBOM) configurations, active compiler optimization versions, and base operating system kernel flags from memory headers."
+    },
+    "FL-BOOT-HEADER": {
+        "title": "ESP32 Bootloader Header Verified",
+        "base_severity": "Info",
+        "cwes": [],
+        "description": "The system validated the structure, segment distribution counts, and cryptographic magic identifiers of the physical flash initialization sequence bootstrapping block."
+    },
+    "FL-BOOT-SIGNATURE": {
+        "title": "Missing Secure Boot Signature Sector",
+        "base_severity": "High",
+        "cwes": ["CWE-347"],
+        "description": "The expected physical signature verification appends for Secure Boot V2 constraints are entirely missing or unpopulated within the high-memory image trailer layout maps."
+    },
+    "FL-HARD-ENCRYPTION": {
+        "title": "Hardware Flash Encryption Appears Disabled",
+        "base_severity": "High",
+        "cwes": ["CWE-311", "CWE-1200"],
+        "description": "The computed global block entropy density scores drop far below production thresholds. Plaintext data blocks indicate the transparent hardware cryptographic flash encryption core is disengaged."
+    },
+    "FL-CRED-HARDCODED": {
+        "title": "Hardcoded Static Credentials or Sensitive Secrets Exposed",
+        "base_severity": "Critical",
+        "cwes": ["CWE-798", "CWE-312"],
+        "description": "Plaintext passwords, high-entropy tokens, encryption keys, or identity secrets were isolated unmasked inside application code space segments, risking offline data harvesting."
+    },
+    "FL-CRED-PRIVATEKEY": {
+        "title": "Private Key Marker Found in Firmware",
+        "base_severity": "Critical",
+        "cwes": ["CWE-321", "CWE-327"],
+        "description": "Asymmetric cryptographic private key structures were isolated unencrypted within the storage map, exposing transmission avenues to decryption or device spoofing campaigns."
+    },
+    "FL-CIPH-WEAK": {
+        "title": "Cryptographic Engine Configuration Profile Identified",
+        "base_severity": "Medium",
+        "cwes": ["CWE-327", "CWE-328"],
+        "description": "Identified operational cryptographic primitives. High-risk instances indicate the usage of broken or collision-prone hashing routines (like MD5) that violate compliance policies."
+    },
+    "FL-NETW-URL": {
+        "title": "Hardcoded Public Network Endpoint Target",
+        "base_severity": "Low",
+        "cwes": ["CWE-200"],
+        "description": "Plaintext Uniform Resource Identifiers, operational hostnames, remote server routes, or protocol handlers are compiled static, exposing infrastructure layouts."
+    },
+    "FL-NETW-IP": {
+        "title": "Static IPv4 Address Infiltration Boundary",
+        "base_severity": "Low",
+        "cwes": ["CWE-798", "CWE-200"],
+        "description": "Hardcoded IPv4 address assignments were extracted from compiled segments. These indicators leak operational destination topologies or development configurations."
+    },
+    "FL-NETW-CLEARTEXT": {
+        "title": "Cleartext Network Transport Endpoint Discovered",
+        "base_severity": "High",
+        "cwes": ["CWE-319"],
+        "description": "The firmware utilizes cleartext communication transport protocol endpoints (such as unencrypted HTTP, MQTT, or WS paths), exposing payloads to transit manipulation."
+    },
+    "FL-BACKDOOR-PATH": {
+        "title": "Hidden Administrative/Debug URI Path Discovered",
+        "base_severity": "High",
+        "cwes": ["CWE-425", "CWE-912"],
+        "description": "Privileged maintenance sub-routing paths or diagnostic interface endpoints were discovered compiled within binary strings, bypassing standard security visibility parameters."
+    },
+    "FL-OBFU-XOR": {
+        "title": "Potential XOR-obfuscated Data Detected",
+        "base_severity": "Medium",
+        "cwes": ["CWE-327"],
+        "description": "Repeated mathematical single-byte patterns indicate primitive data masking routines are implemented to obscure configuration constants rather than true cryptographic ciphers."
+    },
+    "FIRM-ESP32-PART-010": {
+        "title": "Missing Standard NVS Area Mapping",
+        "base_severity": "Medium",
+        "cwes": ["CWE-665"],
+        "description": "Non-Volatile Storage (NVS) configurations are completely absent from the logical partition index framework."
+    },
+    "FIRM-ESP32-PART-021": {
+        "title": "Oversized NVS Storage Boundary Region",
+        "base_severity": "Medium",
+        "cwes": ["CWE-312"],
+        "description": "An oversized NVS configuration target space increases exposure surfaces to offline key extraction."
+    },
+    "FIRM-ESP32-PART-030": {
+        "title": "Unencrypted Sensitive Data Partition Identified",
+        "base_severity": "High",
+        "cwes": ["CWE-311", "CWE-312"],
+        "description": "The target partition stores sensitive secrets but lacks hardware-enforced encryption attribute flags inside the registry table."
+    },
+    "FIRM-ESP32-PART-040": {
+        "title": "Critical Partition Boundary Overlap Detected",
+        "base_severity": "Critical",
+        "cwes": ["CWE-119", "CWE-125"],
+        "description": "Logical partition boundary definitions intersect or overlap, indicating absolute susceptibility to memory boundary overwrites."
+    },
+    "FIRM-ESP32-PART-050": {
+        "title": "Broken OTA Topology Matrix",
+        "base_severity": "High",
+        "cwes": ["CWE-1310"],
+        "description": "The application contains update targets but lacks an 'otadata' control block partition, breaking rollback safeties."
+    },
+    "FIRM-ESP32-PART-055": {
+        "title": "Missing Secure Remote Patching Capabilities",
+        "base_severity": "Medium",
+        "cwes": ["CWE-1310"],
+        "description": "Firmware relies exclusively on static factory layouts without remote upgrade capabilities."
+    },
+    "FIRM-APP-FUNC-GETS": {
+        "title": "High-Risk Memory Operation Verified: 'gets'",
+        "base_severity": "Critical",
+        "cwes": ["CWE-242", "CWE-119"],
+        "description": "The inherently dangerous function 'gets' was identified in the binary layout, exposing immediate stack corruption surfaces."
+    },
+    "FIRM-APP-FUNC-STRCPY": {
+        "title": "High-Risk Memory Operation Verified: 'strcpy'",
+        "base_severity": "High",
+        "cwes": ["CWE-120", "CWE-119"],
+        "description": "An unbounded copy operation ('strcpy') was verified, allowing external inputs to corrupt memory sectors."
+    },
+    "FIRM-APP-FUNC-STRCAT": {
+        "title": "High-Risk Memory Operation Verified: 'strcat'",
+        "base_severity": "High",
+        "cwes": ["CWE-120", "CWE-119"],
+        "description": "An unconstrained string concatenation routing ('strcat') was identified, creating potential execution buffer contamination risks."
+    },
+    "FIRM-APP-FUNC-SPRINTF": {
+        "title": "High-Risk Memory Operation Verified: 'sprintf'",
+        "base_severity": "High",
+        "cwes": ["CWE-676", "CWE-119"],
+        "description": "An unsafe format string target variant ('sprintf') missing explicit length constraint parameters was identified."
+    },
+    "FIRM-APP-FUNC-MEMCPY": {
+        "title": "High-Risk Memory Operation Verified: 'memcpy'",
+        "base_severity": "Medium",
+        "cwes": ["CWE-119"],
+        "description": "A block memory transfer primitive ('memcpy') lacking strict runtime size boundary assertions was verified."
+    },
+    "FIRM-APP-UNSAFEFUNC-002": {
+        "title": "Unbounded Format String Parameter Detected",
+        "base_severity": "High",
+        "cwes": ["CWE-134", "CWE-120"],
+        "description": "An unconstrained string formatting specifier token ('%s') was identified isolated inside code segments."
+    }
+}

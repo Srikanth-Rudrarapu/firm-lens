@@ -28,7 +28,6 @@ class CVEAnalyzer:
     def run(self, environment_findings: Any) -> List[Finding]:
         cve_findings = []
         
-        # Type Safety Guard - Prevents crashing if the main execution loop accidentally feeds this module a string.
         if not isinstance(environment_findings, list):
             return cve_findings
 
@@ -36,52 +35,55 @@ class CVEAnalyzer:
             return cve_findings
 
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
 
-            for f in environment_findings:
-                # Secondary Type Guard
-                if not hasattr(f, 'title') or not isinstance(f.title, str):
-                    continue
+                for f in environment_findings:
+                    if not hasattr(f, 'evidence') or not isinstance(f.evidence, str):
+                        continue
 
-                #  Data Normalization - Converts "Detected ESP-IDF SDK Core Layer" -> "ESP-IDF" to match the database exactly.
-                extracted_name = f.title.replace("Detected ", "").replace(" SDK", "").strip()
-                sdk_name = extracted_name.split()[0] 
-                
-                version_match = re.search(r'(\d+\.\d+(?:\.\d+)?)', f.evidence)
-                if not version_match:
-                    continue
+                    # Robust vendor extraction completely insulated from Title modifications
+                    sdk_name = None
+                    for token in ["ESP-IDF", "MbedTLS", "FreeRTOS", "Arduino-ESP32"]:
+                        if token in f.evidence:
+                            sdk_name = token
+                            break
                     
-                version = version_match.group(1)
-                major_minor = ".".join(version.split(".")[:2])
-
-                query = """
-                    SELECT cve_id, description, severity, cwe_id 
-                    FROM vulnerabilities 
-                    WHERE component_name = ? AND affected_version LIKE ?
-                """
-                
-                cursor.execute(query, (sdk_name, f"%{major_minor}%"))
-                rows = cursor.fetchall()
-
-                for row in rows:
-                    cve_id, description, severity, cwe_id = row
-                    
-                    if any(cve.id == cve_id for cve in cve_findings):
+                    if not sdk_name:
                         continue
                         
-                    cve_findings.append(Finding(
-                        id=cve_id,
-                        title=f"Known Exploit Vector in {sdk_name}",
-                        description=description,
-                        severity=severity if severity else "Critical",
-                        cwes=[cwe_id] if cwe_id else ["CWE-937"],
-                        evidence=f"Discovered via SBOM version fingerprint: {version}",
-                        offset=f.offset if f.offset else "-",
-                        component="supply_chain"
-                    ))
+                    version_match = re.search(r'(\d+\.\d+(?:\.\d+)?)', f.evidence)
+                    if not version_match:
+                        continue
+                        
+                    version = version_match.group(1)
+                    major_minor = ".".join(version.split(".")[:2])
+
+                    query = """
+                        SELECT cve_id, description, severity, cwe_id 
+                        FROM vulnerabilities 
+                        WHERE component_name = ? AND affected_version LIKE ?
+                    """
                     
-            conn.close()
+                    cursor.execute(query, (sdk_name, f"%{major_minor}%"))
+                    rows = cursor.fetchall()
+
+                    for row in rows:
+                        cve_id, description, severity, cwe_id = row
+                        
+                        if any(cve.id == cve_id for cve in cve_findings):
+                            continue
+                            
+                        # Build pristine supply-chain artifacts
+                        cve_findings.append(Finding(
+                            id=cve_id,
+                            title=f"Known Supply Chain Vulnerability: {cve_id}",
+                            description=description,
+                            severity=severity if severity else "High",
+                            cwes=[cwe_id] if cwe_id else ["CWE-937"],
+                            evidence=f"Matched software component signature: {sdk_name} v{version}",
+                            offset=getattr(f, 'offset', '-')
+                        ))
         except Exception:
             pass
 

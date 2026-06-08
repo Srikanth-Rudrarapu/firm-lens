@@ -1,87 +1,87 @@
 import re
-import os
 from typing import List, Dict, Any
 from firm_lens.utils.string_extractor import StringExtractor
 from firm_lens.utils.findings import Finding
 
 class AppStringAnalyzer:
-    """Advanced Static Analysis (SAST) for Firmware Strings."""
-
-    def __init__(self, min_string_length: int = 4):
-        self.extractor = StringExtractor(min_length=min_string_length)
-        self._patterns = {
-            "hardcoded_secrets": [
-                re.compile(r"(?i)(password|passwd|pwd)\s*[:=]\s*[^,\s]{4,}"),
-                re.compile(r"(?i)(api[_-]?key|secret|token)\s*[:=]\s*[^,\s]{8,}"),
-            ],
-            "jwt": [re.compile(r"eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}")],
-            "url": [re.compile(r"https?://[a-zA-Z0-9._:/\-?&=%]+")],
-            "private_key": [re.compile(r"-----BEGIN (RSA|EC|PRIVATE) KEY-----")],
-            "debug": [re.compile(r"(?i)(debug mode|test build|dev build|godmode)")],
-        }
-
-    def run(self, firmware_map: Any) -> List[Finding]:
-        findings: List[Finding] = []
+    """Detects application-layer information leakage, hardcoded credentials, and struct-based memory escrow."""
+    def __init__(self):
+        self.extractor = StringExtractor(min_length=4)
         
-        # Fallback to direct file streaming if context map is missing
-        if isinstance(firmware_map, str):
-            if not os.path.exists(firmware_map): return []
-            with open(firmware_map, "rb") as f:
-                strings = self.extractor.extract_from_bytes(f.read())
-            for offset, s in strings:
-                self._match_patterns(offset, s, findings)
+        # Heuristic 1: Explicit Key-Value assignments (e.g., JSON, INI, or explicit string logs)
+        self.secret_rx_bytes = re.compile(b"(?i)(?:\"|'|)(password|passwd|secret|ssid|api[_-]?key)(?:\"|'|)[\\x00-\\x20:=,]+(?:\"|'|)([\\x20-\\x7E]{4,64})(?:\"|'|)")
+        self.pk_rx_bytes = re.compile(b"(?i)(BEGIN[\\x20-\\x7E]*PRIVATE KEY)")
+        
+        # Heuristic 2: ESP-IDF wifi_config_t Memory Layout Signature
+        # Looks for 1-31 printable chars + null padding, immediately followed by 8-63 printable chars + null padding
+        self.struct_rx_bytes = re.compile(b"([\\x20-\\x7E]{3,31})\\x00+([\\x20-\\x7E]{8,63})\\x00+")
+
+        self.internal_vars = {"identifier", "ap.passwd", "sta.authmode", "sta.lis_intval", "wifi_config"}
+
+    def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
+        findings: List[Finding] = []
+        raw_data = firmware_map.get("raw_binary", b"")
+        if not raw_data: 
             return findings
 
-        for segment in firmware_map.get("segments", []):
-            segment_data = segment.get("data", b"")
-            load_addr = segment.get("addr", "0x0")
-            strings = self.extractor.extract_from_bytes(segment_data)
+        # --- THE O-1 HEURISTIC NOISE FILTERS ---
+        c_format_junk = ["%s", "%d", "%x", "%02x", "%.*s", "%lu", "%c", "%u", "%04x"]
+        log_junk = ["fail", "error", "esp_err", "length", "encrypted", "threshold", "position", "bssid", "same", "none", "hidden", "making it impossible", "convert fail"]
 
-            for offset, s in strings:
-                relative_offset = int(load_addr, 16) + offset
-                self._match_patterns(relative_offset, s, findings)
+        try:
+            # 1. Scan for ESP-IDF wifi_config_t Structs in raw memory
+            for match in self.struct_rx_bytes.finditer(raw_data):
+                potential_ssid = match.group(1).decode('ascii', errors='ignore').strip()
+                potential_pass = match.group(2).decode('ascii', errors='ignore').strip()
+                
+                # Filter out format strings and logs from the struct scanner
+                if any(junk in potential_ssid.lower() or junk in potential_pass.lower() for junk in c_format_junk + log_junk):
+                    continue
+                    
+                # If it looks like a valid credential pair in memory, flag it
+                if len(potential_pass) >= 8 and " " not in potential_pass:
+                    findings.append(Finding(
+                        id="FL-CRED-STRUCT", 
+                        title="Hardcoded Wi-Fi Config Struct Detected",
+                        evidence=f"Memory Block -> SSID: '{potential_ssid}' | PSK: '{potential_pass}'", 
+                        offset=hex(match.start())
+                    ))
+
+            # 2. Scan for Explicit Strings
+            for match in self.secret_rx_bytes.finditer(raw_data):
+                key = match.group(1).decode('ascii', errors='ignore').upper()
+                secret_val = match.group(2).decode('ascii', errors='ignore')
+                
+                clean_secret = re.sub(r'[^\x20-\x7E]', '', secret_val).strip()
+                clean_lower = clean_secret.lower()
+                
+                if len(clean_secret) < 4 or clean_lower in self.internal_vars:
+                    continue
+                if any(junk in clean_lower for junk in c_format_junk):
+                    continue
+                if any(junk in clean_lower for junk in log_junk):
+                    continue
+
+                findings.append(Finding(
+                    id="FL-CRED-HARDCODED", 
+                    title=f"Hardcoded {key} String Escrow",
+                    evidence=f"{key}={clean_secret}", 
+                    offset=hex(match.start())
+                ))
+
+            # 3. Scan for Private Keys
+            for match in self.pk_rx_bytes.finditer(raw_data):
+                pk_val = match.group(1).decode('ascii', errors='ignore')
+                clean_pk = re.sub(r'[^\x20-\x7E]', '', pk_val).strip()
+                findings.append(Finding(
+                    id="FL-CRED-PRIVATEKEY", 
+                    title="Private Key Header Detected",
+                    evidence=clean_pk, 
+                    offset=hex(match.start())
+                ))
+        except Exception:
+            pass
         return findings
 
-    def _match_patterns(self, offset: int, s: str, findings: List[Finding]):
-        for rx in self._patterns["private_key"]:
-            if rx.search(s):
-                findings.append(Finding(
-                    id="FIRM-APP-KEY-001",
-                    title="Private key marker found in firmware",
-                    description="An embedded cryptographic key signature block was parsed inside the image.",
-                    severity="Critical",
-                    cwes=["CWE-321", "CWE-327"],
-                    evidence=s[:120],
-                    offset=hex(offset) if isinstance(offset, int) else str(offset),
-                    component="app_memory"
-                ))
-                return
-
-        for rx in self._patterns["hardcoded_secrets"]:
-            if rx.search(s):
-                findings.append(Finding(
-                    id="FIRM-APP-SECRET-001",
-                    title="Potential hardcoded secret",
-                    description="Strings matching sensitive credential criteria discovered in application plaintext strings.",
-                    severity="High",
-                    cwes=["CWE-798"],
-                    evidence=s[:120],
-                    offset=hex(offset) if isinstance(offset, int) else str(offset),
-                    component="app_memory"
-                ))
-
-        for rx in self._patterns["url"]:
-            m = rx.search(s)
-            if m:
-                url = m.group(0)
-                is_insecure = url.startswith("http://")
-                findings.append(Finding(
-                    id="FIRM-APP-URL-001",
-                    title="Insecure Endpoint Found" if is_insecure else "App Endpoint Found",
-                    description="Hardcoded target server API endpoint detected inside binary fields.",
-                    severity="High" if is_insecure else "Medium",
-                    cwes=["CWE-319"] if is_insecure else [],
-                    evidence=url,
-                    offset=hex(offset) if isinstance(offset, int) else str(offset),
-                    component="app_memory"
-                ))
+    def run(self, firmware_path: str) -> List[Finding]: 
+        return []

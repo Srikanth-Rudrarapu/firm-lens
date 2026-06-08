@@ -3,48 +3,63 @@ import os
 
 def initialize_vulnerability_db():
     """
-    Compiles industry-standard ESP32 vulnerability metrics, CVE definitions,
-    and CWE remediation blueprints into a localized relational SQLite database.
-    Eliminates code hardcoding to fulfill O-1 enterprise architecture requirements.
+    Initializes a localized relational database schema to act as an offline
+    threat intelligence cache. This supports strict air-gapped sandbox execution
+    by separating live threat data streams from core binary analysis logic.
     """
-    # Dynamically resolve the path to the same directory this script resides in
     current_dir = os.path.dirname(os.path.abspath(__file__))
     db_path = os.path.join(current_dir, "vulnerabilities.db")
     
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    # 1. CREATE ENTERPRISE CVE VULNERABILITY SCHEMA
+    # 1. CORE COGNITIVE INTERFACE: MAPS PUBLIC CVE ENTRIES TO WEAKNESS CODES
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS vulnerabilities (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            cve_id TEXT NOT NULL,
-            component_name TEXT NOT NULL,
-            affected_version TEXT NOT NULL,
-            description TEXT NOT NULL,
-            severity TEXT NOT NULL,
-            cwe_id TEXT
+        CREATE TABLE IF NOT EXISTS cve_cwe_mapping (
+            cve_id TEXT PRIMARY KEY,
+            cwe_id TEXT NOT NULL,
+            component_target TEXT NOT NULL,
+            base_severity TEXT NOT NULL
         )
     """)
     
-    # 2. CREATE ENTERPRISE CWE REMEDIATION KNOWLEDGE SCHEMA
+    # 2. TELEMETRY CACHE: STORES LIVE VOLATILE DATA FROM PUBLIC THREAT FEEDS
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS threat_intel_cache (
+            cve_id TEXT PRIMARY KEY,
+            epss_score REAL NOT NULL,
+            kev_status INTEGER NOT NULL DEFAULT 0,
+            last_synced TEXT NOT NULL,
+            FOREIGN KEY(cve_id) REFERENCES cve_cwe_mapping(cve_id) ON DELETE CASCADE
+        )
+    """)
+
+    # 3. REMEDIATION BLUEPRINTS ARCHIVE
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS remediations (
             cwe_id TEXT PRIMARY KEY,
             blueprint_text TEXT NOT NULL
         )
     """)
+
+    # 4. REGULATORY COMPLIANCE FRAMEWORK MAPPINGS (Resolves Hardcoded Reports)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS compliance_mappings (
+            cwe_id TEXT PRIMARY KEY,
+            nist_sp_800_213 TEXT NOT NULL,
+            etsi_en_303_645 TEXT NOT NULL
+        )
+    """)
     
-    # Industrial dataset payload for architecture supply chain correlation
-    sample_intel = [
-        ("CVE-2021-28150", "ESP-IDF", "4.2", "Memory corruption leading to arbitrary code execution via custom Wi-Fi frames.", "Critical", "CWE-120"),
-        ("CVE-2020-15048", "ESP-IDF", "4.2", "Improper verification of signatures allows bootloader restriction bypass.", "High", "CWE-347"),
-        ("CVE-2022-35860", "ESP-IDF", "4.4", "Heap-based buffer overflow in the network interface controller subsystem.", "High", "CWE-787"),
-        ("CVE-2021-44732", "MbedTLS", "2.16", "Side-channel vulnerability in modular exponentiation allows private key extraction.", "High", "CWE-203"),
-        ("CVE-2022-30767", "MbedTLS", "2.28.0", "Stack-based buffer overflow during handshake message processing.", "Critical", "CWE-121")
+    # Seed data providing an immediate base layer for Espressif components
+    initial_architecture_seeds = [
+        ("CVE-2021-28150", "CWE-120", "ESP-IDF Bootloader Suite", "Critical"),
+        ("CVE-2020-15048", "CWE-347", "ESP-IDF Secure Boot Engine", "High"),
+        ("CVE-2022-35860", "CWE-787", "ESP-IDF Wi-Fi Driver Layer", "High"),
+        ("CVE-2021-44732", "CWE-203", "MbedTLS Crypto Hardware Acceleration", "High"),
+        ("CVE-2022-30767", "CWE-121", "MbedTLS Handshake Subsystem", "Critical")
     ]
-    
-    # Decoupled industry-standard ESP32 security remediation matrices
+
     remediation_blueprints = [
         ("CWE-347", "Enforce hardware-rooted RSA/ECDSA asymmetric signature verification schemes. In your 'sdkconfig', explicitly toggle 'CONFIG_SECURE_BOOT_V2_ENABLED=y' and lock the public key digest irreversibly into the physical eFuse block."),
         ("CWE-311", "Activate the built-in AES-256 transparent Flash Encryption engine. Ensure 'CONFIG_SECURE_FLASH_ENC_ENABLED=y' is enforced in the bootloader layout configuration so unencrypted application partitions cannot be dumped over UART physical diagnostic boundaries."),
@@ -52,31 +67,32 @@ def initialize_vulnerability_db():
         ("CWE-798", "Purge raw credential values, private keys, and API tokens from code strings. Migrate secret data into an independent, encrypted NVS partition block or handle configuration handshakes dynamically using runtime encrypted key exchanges."),
         ("CWE-312", "Never write plaintext credential artifacts to non-volatile flash buffers. Encrypt the target storage blocks using the Espressif NVS encryption utility API or migrate to runtime storage configurations that clear variables directly from volatile SRAM blocks upon power cycles."),
         ("CWE-327", "Decommission outdated cryptographic signatures like MD5 or primitive XOR obfuscation tables. Refactor codebase routines to utilize strong, hardware-accelerated primitives such as SHA-256 or hardware-managed AES-GCM engine wrappers."),
-        ("CWE-328", "Deprecate weak collision-prone hashing functions (MD5/SHA1). Replace hashing engines with SHA-256 or SHA-512 libraries, taking advantage of the hardware crypto-acceleration sub-blocks present on modern ESP32 architectures."),
         ("CWE-134", "Eliminate direct user-controlled arguments inside raw formatting output functions. Replace open format strings with safe positional bounds or rewrite direct print sinks to leverage explicitly protected length variables."),
-        ("CWE-120", "Replace bounded buffer overflow candidates (strcpy, sprintf) with strict alternative implementations (strncpy, snprintf). Validate array boundary indices prior to writing data blocks into memory segments to avoid heap/stack contamination."),
-        ("CWE-489", "Deactivate debug logic and diagnostic tracking instrumentation hooks prior to preparing production binary outputs. Strip 'X-Debug-Token' variables and remove verbose terminal logging macros using compiler flag controls."),
-        ("CWE-912", "Purge diagnostic administrative routing tables, open test scripts, or physical backdoor routing segments from distribution images. Enforce strict token-based authorization frameworks across every exposed local and network API path."),
-        ("CWE-425", "Enforce robust server-side structural access validation matrices. Unauthenticated routing tokens must never grant execution paths to internal device configuration operations simply by guessing hidden path extensions."),
         ("CWE-319", "Upgrade transport communication pathways from cleartext variants to transport-layer security wrappers. Replace 'mqtt://' and 'http://' endpoints with 'mqtts://' and 'https://' tracking structures, validating root CA arrays at runtime."),
         ("CWE-1310", "Implement hardware configuration layout profiles that support multi-slot over-the-air (OTA) boot partitions. Ensure flash table mappings provide secure rollback protection tracking boundaries.")
     ]
+
+    compliance_seeds = [
+        ("CWE-347", "NIST SP 800-213 § 4.2.1 (Secure Device Boot Strapping)", "ETSI EN 303 645 Standard Audit Baseline"),
+        ("CWE-311", "NIST SP 800-213 § 4.2.1 (Secure Device Boot Strapping)", "ETSI EN 303 645 Standard Audit Baseline"),
+        ("CWE-1200", "NIST SP 800-213 Hardware Security Core", "ETSI EN 303 645 Physical Hardening Metrics"),
+        ("CWE-798", "NIST SP 800-213 Data Protection Baseline", "ETSI EN 303 645 Compliance Rule 5.1-1 (No Hardcoded Credentials)"),
+        ("CWE-312", "NIST SP 800-213 Storage Security", "ETSI EN 303 645 Data Protection at Rest"),
+        ("CWE-327", "NIST SP 800-213 Cryptographic Baseline", "ETSI EN 303 645 Cipher Compliance"),
+        ("CWE-134", "NIST SP 800-213 Memory Safety Protection", "ETSI EN 303 645 Secure Software Development"),
+        ("CWE-319", "NIST SP 800-213 Transport Security", "ETSI EN 303 645 Protection of Data in Transit"),
+        ("CWE-1310", "NIST SP 800-213 Firmware Management Lifecycle", "ETSI EN 303 645 Secure Software Update Engine")
+    ]
     
-    # Seed vulnerabilities table securely
-    cursor.execute("SELECT COUNT(*) FROM vulnerabilities")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("""
-            INSERT INTO vulnerabilities (cve_id, component_name, affected_version, description, severity, cwe_id)
-            VALUES (?, ?, ?, ?, ?, ?)
-        """, sample_intel)
+    # Execute batch insertions securely
+    for seed in initial_architecture_seeds:
+        cursor.execute("INSERT OR IGNORE INTO cve_cwe_mapping VALUES (?, ?, ?, ?)", seed)
         
-    # Seed remediations table securely
-    cursor.execute("SELECT COUNT(*) FROM remediations")
-    if cursor.fetchone()[0] == 0:
-        cursor.executemany("""
-            INSERT INTO remediations (cwe_id, blueprint_text)
-            VALUES (?, ?)
-        """, remediation_blueprints)
+    for cwe, text in remediation_blueprints:
+        cursor.execute("INSERT OR IGNORE INTO remediations VALUES (?, ?)", (cwe, text))
+
+    for cwe, nist, etsi in compliance_seeds:
+        cursor.execute("INSERT OR IGNORE INTO compliance_mappings VALUES (?, ?, ?)", (cwe, nist, etsi))
         
     conn.commit()
     conn.close()

@@ -7,6 +7,7 @@ class ESP32PartitionAnalyzer:
     Advanced Partition Table Security Analyzer.
     Scans full memory structures to reassemble ESP-IDF partition layouts,
     running deep audits on storage overlaps, encryption flags, and upgrade safety.
+    Operates as a stateless sensor decoupled from core rules and threat intelligence.
     """
 
     def __init__(self):
@@ -22,7 +23,7 @@ class ESP32PartitionAnalyzer:
         if not partitions and raw_data:
             partitions = self._deep_carve_flash_space(raw_data)
 
-       # Empty severity findings are filtered out.
+        if not partitions:
             return findings
 
         labels = {str(p.get("name", "")).strip().lower() for p in partitions}
@@ -31,13 +32,7 @@ class ESP32PartitionAnalyzer:
         if "nvs" not in labels:
             findings.append(Finding(
                 id="FIRM-ESP32-PART-010",
-                title="Missing Standard NVS Area Mapping",
-                description=f"Non-Volatile Storage (NVS) configurations are absent. Found blocks: {list(labels)}",
-                severity="Medium",
-                cwes=["CWE-665"],
-                evidence="NVS allocation block missing from device structural maps.",
-                offset="-",
-                component="partition_table"
+                evidence="NVS allocation block missing from device structural maps."
             ))
 
         # Re-usable structures for cross-partition analytics
@@ -68,40 +63,29 @@ class ESP32PartitionAnalyzer:
                 elif p_type == 0x01 and p_subtype == 0x00:  # Data / OTA Select
                     has_ota_data = True
 
-                # Check 2: Oversized NVS Boundaries (Credential Exhaustion Surface)
+                # Check 2: Oversized NVS Boundaries
                 if p_name == "nvs" and p_size > 0x10000:
                     findings.append(Finding(
                         id="FIRM-ESP32-PART-021",
-                        title="Oversized NVS Storage Boundary Region",
-                        description=f"An oversized NVS configuration target space ({hex(p_size)} bytes) increases offline key brute-force extraction exposure vectors.",
-                        severity="Medium",
-                        cwes=["CWE-312"],
                         evidence=f"Allocation size: {hex(p_size)} bytes at flash target base address {hex(p_offset_int)}",
-                        offset=hex(p_offset_int),
-                        component="partition_table"
+                        offset=hex(p_offset_int)
                     ))
 
-                # Check 3: Missing Encryption Enforced Flag on Sensitive Segments (CWE-311)
-                # ESP-IDF definition: Bit 0 of partition flags requires Flash Encryption (PART_FLAG_ENCRYPTED = 1<<0)
+                # Check 3: Missing Encryption Enforced Flag on Sensitive Segments
                 sensitive_keywords = ["nvs", "cert", "key", "auth", "credential", "secret"]
                 if any(k in p_name for k in sensitive_keywords):
                     if (p_flags & 0x01) == 0:
                         findings.append(Finding(
                             id="FIRM-ESP32-PART-030",
-                            title=f"Unencrypted Sensitive Data Partition Found: '{p.get('name')}'",
-                            description=f"The partition '{p.get('name')}' stores system credentials but lacks the hardware-enforced encryption attribute bit.",
-                            severity="High",
-                            cwes=["CWE-311", "CWE-312"],
                             evidence=f"Partition entry flags field: {hex(p_flags)} (Bit 0 for Flash Encryption is disabled)",
-                            offset=hex(p_offset_int),
-                            component="partition_table"
+                            offset=hex(p_offset_int)
                         ))
 
             except Exception:
                 continue
 
-        # Check 4: Boundary Overlap Integrity Scan (CWE-119 / Tamper Detection)
-        partition_bounds.sort(key=lambda x: x[1])  # Sort by offset order
+        # Check 4: Boundary Overlap Integrity Scan
+        partition_bounds.sort(key=lambda x: x[1])
         for i in range(len(partition_bounds) - 1):
             curr_name, curr_off, curr_size = partition_bounds[i]
             next_name, next_off, _ = partition_bounds[i+1]
@@ -109,47 +93,26 @@ class ESP32PartitionAnalyzer:
             if curr_off + curr_size > next_off:
                 findings.append(Finding(
                     id="FIRM-ESP32-PART-040",
-                    title="Critical Partition Boundary Overlap Detected",
-                    description=f"Partition '{curr_name}' overlaps into '{next_name}'. This indicates flash space tampering, misconfigured layout links, or high vulnerability to memory boundary overwrites.",
-                    severity="Critical",
-                    cwes=["CWE-119", "CWE-125"],
                     evidence=f"'{curr_name}' tail address ({hex(curr_off + curr_size)}) bleeds into '{next_name}' start block ({hex(next_off)})",
-                    offset=hex(curr_off),
-                    component="partition_table"
+                    offset=hex(curr_off)
                 ))
 
-        # Check 5: Insecure Upgrade Architecture Audits (CWE-1310)
+        # Check 5: Insecure Upgrade Architecture Audits
         if has_ota_slots and not has_ota_data:
             findings.append(Finding(
                 id="FIRM-ESP32-PART-050",
-                title="Broken OTA Topology Matrix",
-                description="App contains functional OTA update slots (ota_0/ota_1) but missing an 'otadata' control block partition. Rollbacks and dynamic boot selection maps are exposed or malfunctioning.",
-                severity="High",
-                cwes=["CWE-1310"],
-                evidence="OTA application bins exist without companion otadata reference partition types.",
-                offset="-",
-                component="partition_table"
+                evidence="OTA application bins exist without companion otadata reference partition types."
             ))
         elif has_factory and not has_ota_slots:
             findings.append(Finding(
                 id="FIRM-ESP32-PART-055",
-                title="Missing Secure Remote Patching Capabilities",
-                description="Firmware relies strictly on static factory execution parameters without remote Over-the-Air upgrades. Discovered security vulnerabilities cannot be patched without physical JTAG/UART access.",
-                severity="Medium",
-                cwes=["CWE-1310"],
-                evidence="Factory app slot is configured exclusively; no backup OTA slots mapped.",
-                offset="-",
-                component="partition_table"
+                evidence="Factory app slot is configured exclusively; no backup OTA slots mapped."
             ))
 
         return findings
 
     def _deep_carve_flash_space(self, data: bytes) -> List[Dict[str, Any]]:
-        """
-        Signature-assisted structural carver: Steps through binary on 32-byte alignments.
-        Locates valid partition tables by matching the ESP-IDF partition magic (0x50AA)
-        and harvesting contiguous valid definitions.
-        """
+        """Signature-assisted structural flash layout carver."""
         for offset in range(0, len(data) - 32, 32):
             chunk = data[offset : offset + 32]
             if len(chunk) < 32:
@@ -157,8 +120,6 @@ class ESP32PartitionAnalyzer:
                 
             try:
                 magic_res, p_type, p_subtype, p_offset, p_size, label_raw, flags = struct.unpack(self.part_fmt, chunk)
-                
-                # Check for the explicit ESP-IDF partition record magic signature
                 if magic_res == 0x50AA and p_type in (0x00, 0x01) and 0 < p_size < len(data) and 0 < p_offset < len(data):
                     table_entries = []
                     curr_offset = offset
@@ -175,11 +136,11 @@ class ESP32PartitionAnalyzer:
                                 "name": name if name else f"part_{hex(off)}",
                                 "type": t,
                                 "subtype": st,
-                                "offset": hex(off), # FIXED: Record target block destination address
+                                "offset": hex(off),
                                 "size": sz,
                                 "flags": flgs
                             })
-                        elif m_res == 0xEFEB: # MD5 boundary block
+                        elif m_res == 0xEFEB:
                             break
                         else:
                             break
@@ -189,17 +150,7 @@ class ESP32PartitionAnalyzer:
                         return table_entries
             except Exception:
                 continue
-                
         return []
 
     def run(self, firmware_path: str) -> List[Finding]:
-        """Fallback standalone executor."""
-        try:
-            from firm_lens.extractor.esp32_extractor import ESP32Extractor
-            extractor = ESP32Extractor()
-            firmware_map = extractor.extract(firmware_path)
-            if firmware_map:
-                return self.run_with_map(firmware_path, firmware_map)
-        except Exception:
-            pass
         return []
