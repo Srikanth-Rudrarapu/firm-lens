@@ -422,43 +422,6 @@ def run_analyzers_pipeline(path: str, report_format: str, out_dir: str, base_fil
         except Exception:
             pass
 
-    # ============================================================
-    # 3. STRICT ID-BASED ROLLUP DEDUPLICATION ENGINE
-    # ============================================================
-    # deduped_registry = {}
-    # for f in raw_findings_pool:
-    #     # Group strictly by Vulnerability/Rule ID to consolidate matching rows
-    #     dedup_key = str(f.id).strip().upper()
-    #     if dedup_key not in deduped_registry:
-    #         deduped_registry[dedup_key] = f
-    #         f.tracked_offsets = {str(f.offset).strip()}
-            
-    #         # Cleanly extract trailing matched string signatures from raw evidence labels
-    #         clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
-    #         f.tracked_evidence = {clean_ev}
-    #     else:
-    #         target_f = deduped_registry[dedup_key]
-    #         target_f.tracked_offsets.add(str(f.offset).strip())
-    #         clean_ev = str(f.evidence).replace("Primitive string instruction match: ", "").strip("'\" ")
-    #         target_f.tracked_evidence.add(clean_ev)
-
-    # aggregated_pool = []
-    # for f in deduped_registry.values():
-    #     if hasattr(f, 'tracked_offsets') and len(f.tracked_offsets) > 1:
-    #         offsets_list = sorted(list(f.tracked_offsets))
-    #         if len(offsets_list) > 3:
-    #             f.offset = f"{offsets_list[0]} ... {offsets_list[-1]} ({len(offsets_list)} Locations)"
-    #         else:
-    #             f.offset = ", ".join(offsets_list)
-            
-    #         # Pack consolidated findings evidence tokens cleanly into a clear summary block
-    #         evidence_list = sorted(list(f.tracked_evidence))
-    #         if len(evidence_list) > 6:
-    #             f.evidence = f"Aggregated Telemetry: Extracted {len(offsets_list)} instances across flash memory space. Signatures include: {', '.join(evidence_list[:6])}..."
-    #         else:
-    #             f.evidence = f"Aggregated Telemetry: Extracted {len(offsets_list)} instances across flash memory space. Signatures: {', '.join(evidence_list)}"
-    #     aggregated_pool.append(f)
-
 
     # ============================================================
     # 3. STRICT ID-BASED ROLLUP DEDUPLICATION ENGINE
