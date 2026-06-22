@@ -14,12 +14,13 @@
         "Physical Hardware Device Fuzzing & Interaction": "Physical Hardware Device Fuzzing & Interaction"
     },
     "token_id_substitutions": {
-        "FIRM-SECRET-": "FL-CRED-908B",
+        "FL-CRED-HARDCODED": "FL-CRED-STRUCT",
         "BOOT-ERR-": "FL-BOOT-E91X",
         "MEM-ERR-": "FL-MEMS-032E",
         "PART-ERR-": "FL-PART-S88E",
         "NET-IP-": "FL-NETW-BNDR",
         "NET-URL-": "FL-NETW-SURF",
-        "FIRM-HITL-": "FL-HARD-FUZZ"
+        "FL-HARD-FUZZ": "FL-HITL-001",
+        "FIRM-ESP32-PART-": "FL-PART-S88E"
     }
 }

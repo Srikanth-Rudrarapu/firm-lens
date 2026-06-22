@@ -9,7 +9,7 @@ class InsecureEndpointAnalyzer:
     def __init__(self):
         self.extractor = StringExtractor(min_length=4)
         self.ip_rx = re.compile(r"\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}\b")
-        # Ensure we only capture full URLs, avoiding C format specifiers
+        # Capture full URLs, avoiding C format specifiers
         self.uri_rx = re.compile(r"\b(https?|mqtts?|wss?|coaps?):\/\/[a-zA-Z0-9\-\.]+(?:\/[a-zA-Z0-9\-\._~:/\?#\[\]@!$&'\(\)\*\+,;=]*)?")
 
     def run_with_map(self, firmware_path: str, firmware_map: Dict[str, Any]) -> List[Finding]:
@@ -33,12 +33,22 @@ class InsecureEndpointAnalyzer:
                 if self.ip_rx.search(cleaned):
                     for ip in self.ip_rx.findall(cleaned):
                         # Filter out common localhost/broadcast noise if desired, or keep to map surface
-                        findings.append(Finding(id="FL-NETW-IP", title="Static IPv4 Boundary", evidence=f"Target IP: '{ip}'", offset=hex(offset)))
+                        findings.append(Finding(
+                            id="FL-NETW-IP", 
+                            title="Static IPv4 Boundary", 
+                            evidence=f"Target IPv4 Address: {ip}", 
+                            offset=hex(offset)
+                        ))
                         
                 elif self.uri_rx.search(cleaned):
                     rule_id = "FL-NETW-CLEARTEXT" if any(p in cleaned for p in ["http://", "mqtt://", "ws://"]) else "FL-NETW-URL"
                     title = "Cleartext Transport Endpoint" if rule_id == "FL-NETW-CLEARTEXT" else "Network Endpoint Target"
-                    findings.append(Finding(id=rule_id, title=title, evidence=f"Payload path: '{cleaned}'", offset=hex(offset)))
+                    findings.append(Finding(
+                        id=rule_id, 
+                        title=title, 
+                        evidence=f"Payload path: '{cleaned}'", 
+                        offset=hex(offset)
+                    ))
         except Exception:
             pass
 

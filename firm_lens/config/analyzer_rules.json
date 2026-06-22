@@ -26,7 +26,7 @@
     "FL-CRED-HARDCODED": {
         "title": "Hardcoded Static Credentials or Sensitive Secrets Exposed",
         "base_severity": "Critical",
-        "cwes": ["CWE-798", "CWE-312"],
+        "cwes": ["CWE-798", "CWE-259", "CWE-312"],
         "description": "Plaintext passwords, high-entropy tokens, encryption keys, or identity secrets were isolated unmasked inside application code space segments, risking offline data harvesting."
     },
     "FL-CRED-PRIVATEKEY": {
@@ -98,13 +98,13 @@
     "FIRM-ESP32-PART-050": {
         "title": "Broken OTA Topology Matrix",
         "base_severity": "High",
-        "cwes": ["CWE-1310"],
+        "cwes": ["CWE-1224", "CWE-1310"],
         "description": "The application contains update targets but lacks an 'otadata' control block partition, breaking rollback safeties."
     },
     "FIRM-ESP32-PART-055": {
         "title": "Missing Secure Remote Patching Capabilities",
         "base_severity": "Medium",
-        "cwes": ["CWE-1310"],
+        "cwes": ["CWE-1329", "CWE-1310"],
         "description": "Firmware relies exclusively on static factory layouts without remote upgrade capabilities."
     },
     "FIRM-APP-FUNC-GETS": {

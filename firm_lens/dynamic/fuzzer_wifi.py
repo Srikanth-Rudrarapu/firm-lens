@@ -18,7 +18,6 @@ class WiFiFuzzer:
                 s.connect((self.target_ip, self.target_port))
                 s.sendall(payload)
         except Exception as e:
-            # NEW: Stop hiding the errors!
             console.print(f"[dim red]Socket Error: {str(e)}[/dim red]")
 
     def run(self):

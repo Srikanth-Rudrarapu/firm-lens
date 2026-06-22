@@ -63,4 +63,4 @@ class FirmLensHILMonitor:
         if hasattr(self, 'thread'):
             self.thread.join(timeout=2)
         if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()
+            self.serial_conn.close()    

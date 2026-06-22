@@ -12,7 +12,6 @@ class ESP32Extractor:
         # magic (1B), segment_count (1B), spi_mode (1B), spi_speed_size (1B), entry_addr (4B)
         self.header_fmt = "<BBBB I"
         
-        # FIXED: ESP-IDF Partition Entry Struct Layout is exactly 32 bytes:
         # magic/res (2B), type (1B), subtype (1B), offset (4B), size (4B), label (16s), flags (4B)
         self.part_fmt = "<HBBII16sI"
 

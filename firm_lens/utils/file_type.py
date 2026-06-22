@@ -39,15 +39,11 @@ class FileTypeDetector:
             return "elf"
         if header.startswith(b":"):
             return "hex"
-
-        # Check for ESP32 Main Header Magic (0xE9)
-        if len(header) >= 1 and header[0:1] == b"\xE9":
-            return "esp32"
-
-        # Fallback check for raw STM32 (Vector table stack pointers)
-        if len(header) >= 4:
-            sp = int.from_bytes(header[0:4], "little", signed=False)
-            if 0x20000000 <= sp <= 0x20050000:
-                return "stm32"
+        
+        # Espressif Boot Image Validation (0xE9 Boot Magic)
+        if len(header) >= 4 and header[0:1] == b"\xE9":
+            # Extra verification: Validate that segment count and flash configs look realistic
+            if header[1] <= 16:  # Standard Espressif layouts rarely exceed 16 segments
+                return "esp32"
 
         return "bin"

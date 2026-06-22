@@ -58,10 +58,9 @@ class ESP32PartitionAnalyzer:
                 if p_type == 0x00:  # App Partition
                     if p_subtype == 0x00:
                         has_factory = True
+                        factory_partition_name = p_name 
                     elif 0x10 <= p_subtype < 0x20:
                         has_ota_slots = True
-                elif p_type == 0x01 and p_subtype == 0x00:  # Data / OTA Select
-                    has_ota_data = True
 
                 # Check 2: Oversized NVS Boundaries
                 if p_name == "nvs" and p_size > 0x10000:
@@ -77,7 +76,7 @@ class ESP32PartitionAnalyzer:
                     if (p_flags & 0x01) == 0:
                         findings.append(Finding(
                             id="FIRM-ESP32-PART-030",
-                            evidence=f"Partition entry flags field: {hex(p_flags)} (Bit 0 for Flash Encryption is disabled)",
+                            evidence=f"Target Partition '{p_name}': Flags set to {hex(p_flags)} (Bit 0 Flash Encryption flag missing)",
                             offset=hex(p_offset_int)
                         ))
 
@@ -106,7 +105,7 @@ class ESP32PartitionAnalyzer:
         elif has_factory and not has_ota_slots:
             findings.append(Finding(
                 id="FIRM-ESP32-PART-055",
-                evidence="Factory app slot is configured exclusively; no backup OTA slots mapped."
+                evidence=f"Architecture maps a single '{factory_partition_name}' application slot without secondary OTA recovery partitions."
             ))
 
         return findings

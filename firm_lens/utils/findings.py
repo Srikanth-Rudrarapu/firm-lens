@@ -1,6 +1,7 @@
 import os
+import re
 import json
-from typing import List, Dict, Any
+from typing import List
 
 class Finding:
     """
@@ -8,6 +9,18 @@ class Finding:
     Acts as a stateless data container within the ingestion pipeline.
     Enforces unconditional case-insensitive backfilling from analyzer_rules.json.
     """
+
+    @staticmethod
+    def _sanitize_evidence(raw: str) -> str:
+        """Strip common noise patterns from evidence strings before reporting."""
+        cleaned = re.sub(r'%[0-9]*[sdxXunpclh]', '', raw)
+        cleaned = re.sub(r'(?i)(/idf/|/components/|/lwip/|/esp-idf/)', '', cleaned)
+        cleaned = re.sub(r'(?i)(debug|trace|info|log|printk|printf|console_log)', '', cleaned)
+        cleaned = re.sub(r'\s+', ' ', cleaned).strip()
+        if len(cleaned) < 4:
+            return "[Evidence suppressed: non-actionable firmware string]"
+        return cleaned
+
     def __init__(
         self,
         id: str,
@@ -20,7 +33,8 @@ class Finding:
         component: str = "general"
     ):
         self.id = str(id).strip()
-        self.evidence = evidence
+        # self.evidence = evidence
+        self.evidence = self._sanitize_evidence(str(evidence))
         self.offset = offset
         self.component = component
 
@@ -42,7 +56,7 @@ class Finding:
             }
         }
 
-        # CRITICAL FIX: Execute enrichment unconditionally to backfill missing metrics (like CWEs)
+        # Execute enrichment unconditionally to backfill missing metrics (like CWEs)
         self._enrich_from_static_rules()
 
     def _enrich_from_static_rules(self):
@@ -71,7 +85,7 @@ class Finding:
                     if self.severity == "Medium" or not self.severity:
                         self.severity = rule.get("base_severity", "Medium").capitalize()
                     
-                    # CRITICAL FIX: If the finding has an empty CWE list, backfill it from central configurations
+                    # If the finding has an empty CWE list, backfill it from central configurations
                     if not self.cwes:
                         self.cwes = rule.get("cwes", [])
             except Exception:

@@ -5,43 +5,49 @@ class StringExtractor:
     """
     Industrial-grade High-Performance String Carving Engine.
     Leverages an optimized regular expression execution matrix to extract 
-    printable ASCII streams from massive raw binary buffers safely and instantly.
+    printable ASCII streams and apply semantic squelching for IoT SDKs.
     """
 
     def __init__(self, min_length: int = 4):
         self.min_length = min_length
-        # Pre-compile the pattern to process binary data streams at the native C-level.
-        # Matches printable ASCII characters ranging from space (0x20) to tilde (0x7E).
         self.pattern = re.compile(rb'[\x20-\x7E]{' + str(min_length).encode() + rb',}')
+        
+        # Semantic Noise Filters: Drop known ESP-IDF SDK artifacts
+        self.noise_filters = [
+            re.compile(r'(?i)/IDF/components/|esp-idf|/host/bluedroid|mbedtls'), # SDK Paths
+            re.compile(r'\.[ch](pp)?$', re.IGNORECASE),                           # C/C++ Source file references
+            re.compile(r'^[EWI] \(\d+\) [a-zA-Z0-9_-]+:'),                        # ESP_LOG debug prefixes
+            re.compile(r'^(?:[a-zA-Z_]\w*::)*[a-zA-Z_]\w*\s*\('),                 # Function calls e.g., esp_wifi_init(
+            re.compile(r'^TLS-[A-Z0-9-]+$|^AES-[0-9]+-[A-Z]+'),                   # TLS/Crypto Cipher Suite names
+            re.compile(r'^[A-Z0-9_]{10,}$')                                       # Long ALL_CAPS macros
+        ]
+
+    def _is_semantic_noise(self, text: str) -> bool:
+        """Evaluates if a string is known SDK/Compiler noise."""
+        for noise_pattern in self.noise_filters:
+            if noise_pattern.search(text):
+                return True
+        return False
 
     def extract_from_bytes(self, data: bytes) -> List[Tuple[int, str]]:
-        """
-        Scans a raw binary byte array and extracts strings alongside their exact offsets.
-        Optimized to process massive data footprints with low garbage-collection impact.
-        
-        Returns:
-            A list of tuples containing (byte_offset, decoded_ascii_string).
-        """
         if not data or not isinstance(data, (bytes, bytearray)):
             return []
 
         findings: List[Tuple[int, str]] = []
         
-        # re.finditer handles large 4MB arrays natively with minimal memory allocations
         for match in self.pattern.finditer(data):
-            offset = match.start()
             match_bytes = match.group()
             
-            # Avoiding computing decoding logic on long streams of identical 
-            # repetitive padding bytes (e.g., long sequences of spaces or filler characters)
+            # Avoid decoding logic on repetitive padding bytes (e.g., \x20\x20\x20\x20)
             if len(match_bytes) > 64 and len(set(match_bytes)) < 4:
                 continue
                 
             try:
-                # Extract address offset and decode byte content safely
                 decoded_str = match_bytes.decode("ascii", errors="ignore").strip()
-                if decoded_str:
-                    findings.append((offset, decoded_str))
+                
+                # Check length and apply our new noise filters
+                if len(decoded_str) >= self.min_length and not self._is_semantic_noise(decoded_str):
+                    findings.append((match.start(), decoded_str))
             except Exception:
                 continue
 

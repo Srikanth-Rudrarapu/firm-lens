@@ -2,7 +2,6 @@ import os
 import json
 import urllib.request
 import urllib.parse
-from typing import Dict, Any
 
 def initialize_vulnerability_db():
     """

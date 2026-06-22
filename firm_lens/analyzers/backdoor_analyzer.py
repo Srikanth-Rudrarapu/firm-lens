@@ -18,7 +18,7 @@ class BackdoorAnalyzer:
                 if offset == -1: break
                 findings.append(Finding(
                     id="FL-BACKDOOR-PATH",
-                    evidence=f"Undocumented endpoint reference string string: {path.decode('ascii', errors='ignore')}",
+                    evidence=f"Undocumented endpoint reference identified: {path.decode('ascii', errors='ignore')}",
                     offset=hex(offset)
                 ))
                 offset += len(path)

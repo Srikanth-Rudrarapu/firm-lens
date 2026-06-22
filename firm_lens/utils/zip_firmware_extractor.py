@@ -6,20 +6,18 @@ from typing import List
 
 class ZipFirmwareExtractor:
     """
-    Safely extract firmware images from ZIP-based update packages.
+    Safely extract firmware images and partition segments from ZIP-based update packages.
 
     Supports:
-      - ESP32 OTA bundles (bootloader.bin, app.bin, partitions.bin)
-      - STM32 / HEX-based updates
-      - Router / Android style images (boot.img, system.img, kernel.img, *.bin, *.img, *.hex)
+        - Espressif OTA deployment bundles (bootloader.bin, partition-table.bin, app.bin)
+        - Monolithic flash memory layout containers and custom partition segments (*.bin, *.img, *.hex)
 
-    Security:
-      - Prevents Zip Slip path traversal
-      - Rejects symlinks inside ZIPs
-      - Limits total extracted size
-      - Limits number of files
-      - Rejects nested ZIPs
-      - Only extracts files that look like firmware
+    Security Mitigations:
+        - Path Traversal: Enforces absolute destination boundaries to prevent Zip Slip exploits.
+        - Symlink Rejection: Deep-inspects and rejects soft links/symlinks inside the archive structure.
+        - Resource Protection: Implements strict limits on total extracted size and maximum file count.
+        - Nested Archives: Restricts execution layers by completely rejecting nested ZIP bundles.
+        - Ingestion Filters: Whitelists only file extensions explicitly matching recognized firmware structures.
     """
 
     # Hard safety limits

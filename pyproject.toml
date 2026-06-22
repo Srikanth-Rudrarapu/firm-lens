@@ -3,9 +3,9 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "firm_lens"
+name = "firmlens"
 version = "1.0.1"
-description = "Firmware security analysis tool"
+description = "Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -19,6 +19,7 @@ dependencies = [
     "pycryptodome",
     "esptool>=4.5.0",
     "requests",
+    "pyserial"
 ]
 
 classifiers = [
@@ -34,3 +35,7 @@ firm-lens = "firm_lens.main:cli"
 
 [tool.setuptools]
 packages = ["firm_lens"]
+
+# This ensures vulnerabilities.db and static rules are shipped to the user
+[tool.setuptools.package-data]
+firm_lens = ["data/*"]

@@ -6,6 +6,6 @@ _____ ___ ____  __  __ _     _____ _   _ ____ ____ _
  |  _|  | ||  _ <| |  | | |___| |___| |\  |___) |
  |_|   |___|_| \_\_|  |_|_____|_____|_| \_|____/ 
                                                  
- [ Firmware Extraction & Security Analysis Toolkit ]
+ [ Industrial-Grade Embedded IoT Firmware Security Analysis Engine ]
 
  """

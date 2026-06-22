@@ -7,6 +7,3 @@ recursive-include firm_lens *.json
 global-exclude .DS_Store
 global-exclude *.pyc
 global-exclude __pycache__
-
-# Exclude the samples directory (No trailing slash for Windows compatibility)
-prune samples

@@ -74,28 +74,38 @@ class DangerousFunctionAnalyzer:
 
     def _scan_for_compiled_format_vulnerabilities(self, raw_data: bytes) -> List[Finding]:
         """
-        Scans for raw unconstrained string formatters (%s) inside executable segments
-        which map directly to vulnerable sprintf input sinks.
+        Scans for raw unconstrained string formatters inside executable segments.
+        Uses a strict regex heuristic to target memory-unsafe format specifiers 
+        (%n for writes, or stacked %p/%x for leaks) while dropping URLs and standard logs.
         """
         findings = []
-        target_token = b"%s"
         
-        offset = 0
-        match_count = 0
-        while True:
-            offset = raw_data.find(target_token, offset)
-            if offset == -1 or match_count >= 3:  # Cap records to preserve telemetry readability
-                break
+        # Targets dangerous format string payloads: 
+        # 1. Any string containing %n (writes to memory)
+        # 2. Strings containing 3 or more pointer/string/hex leaks (e.g., %p%p%p, %x.%x.%x)
+        format_string_regex = re.compile(r'(?:%[0-9$]*[pxXsd]){3,}|(?:%[0-9$]*n)')
+        
+        # Squelch list for URL encodings (e.g., %20), date formats, and standard HTML/logs
+        noise_regex = re.compile(r'(?i)(?:%[0-9A-Fa-f]{2}|%Y|%m|%d|%H|%M|%S|https?://|\.com|\.org|\.html?|assert|failed|error|warning|info)')
+
+        try:
+            strings = self.extractor.extract_from_bytes(raw_data)
+            for offset, found_str in strings:
+                clean_str = found_str.strip()
                 
-            context = raw_data[max(0, offset - 5): min(len(raw_data), offset + 5)]
-            
-            findings.append(Finding(
-                id="FIRM-APP-UNSAFEFUNC-002",
-                evidence=f"Raw hex slice at address {hex(offset)}: {context.hex()}",
-                offset=hex(offset)
-            ))
-            offset += 2
-            match_count += 1
+                if format_string_regex.search(clean_str):
+                    if not noise_regex.search(clean_str):
+                        findings.append(Finding(
+                            id="FIRM-APP-UNSAFEFUNC-002",
+                            # Do not manually prepend [0x...] here, main.py now handles it globally
+                            evidence=f"Format string parameter payload: '{clean_str}'",
+                            offset=hex(offset)
+                        ))
+                        
+                        if len(findings) >= 5:
+                            break
+        except Exception:
+            pass
             
         return findings
 

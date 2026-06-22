@@ -21,7 +21,8 @@ class SecureBootAnalyzer:
                 if magic_byte == 0xE9:
                     findings.append(Finding(
                         id="FL-BOOT-HEADER",
-                        evidence=f"Magic code verification: {hex(magic_byte)} | Segment tracking count: {segment_count}",
+                         #Eevidence is explicitly dynamic based on read values
+                        evidence=f"ESP32 Image Header Verified at {hex(boot_offset)} -> Magic Byte: {hex(magic_byte)} | Active Segments: {segment_count}",
                         offset=hex(boot_offset)
                     ))
 
@@ -30,10 +31,13 @@ class SecureBootAnalyzer:
             
             if trailer_offset > 0:
                 signature_block = raw_data[trailer_offset:]
+                # Verify if the block is entirely empty
                 if signature_block == b"\xFF" * 4096 or signature_block == b"\x00" * 4096:
+                    pad_type = "0xFF (Erased Flash)" if signature_block[0] == 0xFF else "0x00 (Null Padding)"
+                    
                     findings.append(Finding(
                         id="FL-BOOT-SIGNATURE",
-                        evidence="Validation trailer boundary failed block entropy assertions.",
+                        evidence=f"Signature Block Analysis at {hex(trailer_offset)}: Expected 4096-byte RSA/ECDSA signature, but found {pad_type}.",
                         offset=hex(trailer_offset)
                     ))
 
