@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "firmlens"
+name = "firm-lens"
 version = "1.0.1"
 description = "Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
 readme = "README.md"
