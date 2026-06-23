@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firm-lens"
-version = "1.0.1"
+version = "1.0.2"
 description = "Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
 readme = "README.md"
 requires-python = ">=3.10"

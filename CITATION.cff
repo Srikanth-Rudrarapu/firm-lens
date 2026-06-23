@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+
+message: "If you use FirmLens in research, publications, technical reports, or security assessments, please cite it using the metadata below."
+
+title: "FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
+
+type: software
+
+authors:
+  - family-names: Rudrarapu
+    given-names: Srikanth
+
+version: 1.0.2
+
+license: MIT
+
+repository-code: https://github.com/Srikanth-Rudrarapu/firm-lens
+
+url: https://github.com/Srikanth-Rudrarapu/firm-lens

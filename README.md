@@ -7,17 +7,70 @@
 [![Platform Support](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blueviolet.svg)]()
 [![Architecture](https://img.shields.io/badge/Architecture-Espressif%20SoCs-orange.svg)]()
 
-FirmLens is a comprehensive security analysis framework engineered specifically for embedded IoT device firmware, with deep-level heuristics optimized for Espressif SoC architectures (ESP32, S2, S3, C3). 
+## Why FirmLens? The Genesis
 
-The framework bridges the gap between static binary analysis and live dynamic hardware testing by automating partition carving, Shannon entropy mapping, symbolic vulnerability tracking, and Hardware-in-the-Loop (HIL) fuzzing into a single analytical pipeline. It ensures compliance with leading international cybersecurity standards, including **NIST SP 800-213** and **ETSI EN 303 645**.
+Embedded firmware security tooling is often fragmented across:
+- generic binary analysis tools
+- emulation-based frameworks
+- vendor-specific debugging utilities
+
+While powerful in isolation, these approaches often lack deep awareness of ESP32 firmware structures such as partition tables, bootloader metadata, and ESP-IDF-specific layouts.
+
+FirmLens was designed to address this gap by providing a focused analysis framework for ESP32-class firmware, combining static inspection with optional hardware-assisted workflows.
+
+It provides an integrated approach that:
+
+1. **Parses ESP32 firmware structures** including partition tables, NVS regions, and bootloader metadata without requiring full-system emulation.
+2. **Correlates static findings with external vulnerability intelligence sources**, including CISA KEV and EPSS, where matches are available, to enrich vulnerability context beyond traditional CVSS scoring.
+3. **Supports Hardware-in-the-Loop (HIL) testing workflows**, enabling controlled input-based testing of connected devices in laboratory environments.
+
+Beyond static analysis, the framework includes mechanisms to detect fault conditions during hardware interaction testing, such as reboot loops, exception traces, and memory corruption indicators. These outputs are mapped to CWE categories to support structured vulnerability reporting.
+
+FirmLens is intended as a **research-grade embedded security analysis framework**, initially optimized for Espressif SoCs (ESP32, ESP32-S2/S3, ESP32-C3), with a modular architecture designed for future extension to other embedded platforms.
+
+It is designed to support embedded security research workflows aligned with industry practices such as **NIST SP 800-213** and **ETSI EN 303 645**, where applicable.
+
+### Scope
+
+It is strictly intended for authorized security research, firmware analysis, and defensive testing in controlled environments.
 
 ---
 
 ## System Architecture & Data Flow
 
-FirmLens utilizes a multi-stage ingestion and correlation pipeline to process raw binaries and map them against live threat intelligence.
+FirmLens uses a multi-stage firmware analysis pipeline designed for ESP32-class devices to process raw firmware binaries and extract structured security-relevant artifacts.
+
+The pipeline performs:
+- firmware partition discovery and parsing
+- entropy-based binary structure mapping
+- static string and configuration analysis
+- optional correlation with external vulnerability intelligence sources such as CISA KEV and EPSS, where applicable
+
+The output of each stage is normalized into structured reports (JSON/HTML) for downstream analysis, reporting, or integration into security workflows.
+
+The system is optimized for Espressif ESP32-family firmware but is designed with a modular architecture that allows future extension to additional embedded architectures.
 
 ![System Architecture](https://raw.githubusercontent.com/Srikanth-Rudrarapu/firm-lens/main/assets/architecture.png)
+
+---
+
+## Comparative Analysis and Project Scope
+
+The following comparison is provided for context, not as a claim of superiority over established tools. Each tool serves a different primary purpose:
+
+| Feature | **FirmLens** | Binwalk | Firmadyne | Embark (EMBArk) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Primary Purpose** | ESP32 security analysis | Generic firmware extraction | Linux firmware emulation | EMBA web dashboard |
+| **ESP32 Partition Table Parser** | Semantic analysis | Signature extraction only | Not applicable | Not applicable |
+| **Live Hardware Extraction (UART)** | Supported | Not supported | Not supported | Not supported |
+| **HIL Fuzzing (Serial/Network)** | Supported | Not supported | Not supported | Not supported |
+| **CISA KEV + EPSS Correlation** | Supported | Not supported | Not supported | Not supported |
+| **CI/CD HTML / JSON Reports** | Supported | Not supported | Not supported | Supported (via EMBA) |
+| **Secure Boot / Flash Encryption Checks** | Supported | Not supported | Not supported | Not supported |
+
+**Clarification**: Binwalk is a widely-used, mature extraction tool that has added ESP32 signatures. FirmLens does not replace Binwalk—rather, it complements it by providing **semantic, Espressif-specific security analysis** that Binwalk does not attempt. Firmadyne targets Linux-based firmware and is not designed for ESP32's FreeRTOS environment. Embark is a web front-end for EMBA, not a standalone analysis engine.
+
+FirmLens occupies a distinct niche: **architectural semantic analysis for Espressif SoCs**, combining static binary inspection, live hardware extraction, and HIL fuzzing into a unified pipeline.
 
 ---
 
@@ -29,7 +82,11 @@ FirmLens requires Python 3.10+ and relies on the Espressif `esptool` for physica
 The recommended installation method for production environments.
 
 ```bash
+#Install
 pip install firm-lens
+
+#Upgrade
+pip install --upgrade firm-lens
 ```
 
 ### Option 2: Install from Source (Bleeding Edge)
@@ -95,11 +152,15 @@ firm-lens extract --live-port /dev/cu.usbserial-0001 --chip esp32 --baud 115200
 or 
 firm-lens extract
 ```
-* **Auto-Discovery:** If `--live-port`, `--chip esp32` and `--baud 115200` is omitted, the engine utilizes native PySerial routines to identify and mount the active USB bridge automatically.
+* **Auto-Discovery:** If `--live-port`, `--chip` and `--baud` is omitted, the engine utilizes native PySerial routines to identify and mount the active USB bridge automatically.
 * **Output Routing:** Automatically writes the target payload to `~/Downloads/hardware_extracted_flash_[TIMESTAMP].bin` unless explicitly overridden via the `-o` flag.
 
 ### 3. Dynamic Hardware-in-the-Loop (HIL) Fuzzing
 Executes live serial or network fuzzing against a connected device to test memory execution boundaries and capture hardware faults in real-time.
+
+* **Serial Payloads:** Injects boundary‑crossing strings (10‑byte, 32‑byte, 100‑byte, and 1000‑byte overflow buffers) plus format string primitives (%x %x %s %n) to exercise boundary conditions associated with buffer overflow and format string weaknesses.
+* **Network Payloads:** Sends oversized HTTP URIs, HTTP header format string injections, and raw TCP junk floods to the target’s TCP stack (port 80 by default).
+* **Crash Correlation:** The serial_monitor continuously scans for Guru Meditation Errors, EXCCAUSE hardware exceptions, abrupt reboots (SW_CPU_RESET), and 414141 (ASCII overflow) memory patterns. Upon detection, the crash_parser maps the fault to CWE-120 (Buffer Overflow) or CWE-134 (Format String) and extracts the corrupted instruction pointer (EPC1).
 
 ```bash
 # Serial UART Fuzzing
@@ -172,9 +233,9 @@ FirmLens provides high-fidelity reporting designed for enterprise security teams
             ],
             "is_vulnerability": true,
             "evidence": [
-                "[0xa524] Memory Block -> SSID: 'OfficeNet' | PSK: 'Passw0rd123!",
-                "[0xc244] Memory Block -> SSID: 'OfficeNet' | PSK: 'Passw0rd123!",
-                "[0xc2d0] Memory Block -> SSID: 'HomeNetwork' | PSK: 'SuperSecret123"
+                "[0xa524] Memory Block -> SSID: 'TestSSID' | PSK: 'TESTPASSWORD123",
+                "[0xc244] Memory Block -> SSID: 'ExampleSSID' | PSK: 'ExamplePassword",
+                "[0xc2d0] Memory Block -> SSID: 'DemoNetwork' | PSK: 'DemoPassword123"
             ],
             "offsets": [
                 "0xa524, 0xc244, 0xc2d0"
@@ -248,14 +309,38 @@ FirmLens provides high-fidelity reporting designed for enterprise security teams
 
 ---
 
-## License
-Distributed under the MIT License. See `LICENSE` for more information.
+## Versioning
 
-## Disclaimer
-FirmLens is engineered strictly for authorized security research, compliance auditing, and defensive engineering. Ensure explicit legal authorization is granted prior to analyzing or interacting with target hardware.
+FirmLens follows Semantic Versioning (SemVer).
+
+- Major versions introduce significant architectural changes.
+- Minor versions introduce new capabilities and analysis modules.
+- Patch versions contain fixes, documentation improvements, and maintenance updates.
+
+## Citation
+
+FirmLens is an open-source firmware security analysis framework. If you use FirmLens in research, publications, technical reports, or security assessments, please cite:
+
+```bibtex
+@software{FirmLens,
+  author = {Rudrarapu, Srikanth},
+  title = {FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine},
+  year = {2026},
+  version = {1.0.2},
+  url = {https://github.com/Srikanth-Rudrarapu/firm-lens}
+}
+```
 
 ## Support the Project
-If you found FirmLens useful for your security research or compliance auditing, please consider giving the repository a ⭐ on GitHub. It helps the project gain visibility and supports ongoing open-source development.
 
+If you found FirmLens useful for your security research or compliance auditing, consider giving the repository a star on GitHub. It helps the project gain visibility and supports ongoing open-source development.
 
 [![GitHub stars](https://img.shields.io/github/stars/Srikanth-Rudrarapu/firm-lens.svg?style=social&label=Star)](https://github.com/Srikanth-Rudrarapu/firm-lens)
+
+## Disclaimer
+
+FirmLens is engineered strictly for authorized security research, compliance auditing, and defensive engineering. Ensure explicit legal authorization is granted prior to analyzing or interacting with target hardware.  
+
+## License
+
+Distributed under the MIT License. See `LICENSE` for more information.  
