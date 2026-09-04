@@ -1,0 +1,11 @@
+{
+  "os_name": "Darwin",
+  "os_release": "25.6.0",
+  "os_version": "Darwin Kernel Version 25.6.0: Fri Jul 31 19:16:20 PDT 2026; root:xnu-12377.161.14~5/RELEASE_ARM64_T8142",
+  "architecture": "arm64",
+  "processor": "arm",
+  "cpu_count": 10,
+  "total_ram_gb": 16.0,
+  "python_version": "3.14.6",
+  "timestamp_utc": "2026-09-04 22:17:05"
+}

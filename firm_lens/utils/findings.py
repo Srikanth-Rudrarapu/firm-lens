@@ -33,30 +33,27 @@ class Finding:
         component: str = "general"
     ):
         self.id = str(id).strip()
-        # self.evidence = evidence
         self.evidence = self._sanitize_evidence(str(evidence))
         self.offset = offset
         self.component = component
 
-        # Injected properties managed via centralized engine orchestration
         self.title = title
         self.description = description
         self.severity = severity.capitalize() if severity else "Medium"
         self.cwes = cwes if cwes else []
         
-        # Threat intelligence and remediation layers injected post-detection
         self.remediation_blueprint = ""
         self.rem_type = "REMEDIATION"
         self.threat_intelligence_telemetry = {
-            "cisa_kev_active_exploitation": "No actively documented exploitation in the wild.",
-            "epss_weaponization_probability": "0.01% (Low risk of near-term weaponization)",
+            "cisa_kev_active_exploitation": "Not listed in CISA KEV Catalog",
+            "epss_weaponization_probability": "N/A",
+            "epss_raw": None,
             "regulatory_compliance_framework_mappings": {
                 "nist_sp_800_213": "NIST SP 800-213 Data Protection Baseline",
                 "etsi_en_303_645": "ETSI EN 303 645 Standard Audit Baseline"
             }
         }
 
-        # Execute enrichment unconditionally to backfill missing metrics (like CWEs)
         self._enrich_from_static_rules()
 
     def _enrich_from_static_rules(self):
@@ -69,7 +66,6 @@ class Finding:
                 with open(rules_path, "r", encoding="utf-8") as f:
                     rules = json.load(f)
                 
-                # Build a normalized dictionary map to eliminate lookup variance friction
                 normalized_rules = {str(k).strip().upper(): v for k, v in rules.items()}
                 
                 target_key = self.id.upper()
@@ -81,11 +77,9 @@ class Finding:
                     if not self.description:
                         self.description = rule.get("description", self.description)
                     
-                    # Only map severity boundaries if the local analyzer did not enforce a custom state
                     if self.severity == "Medium" or not self.severity:
                         self.severity = rule.get("base_severity", "Medium").capitalize()
                     
-                    # If the finding has an empty CWE list, backfill it from central configurations
                     if not self.cwes:
                         self.cwes = rule.get("cwes", [])
             except Exception:

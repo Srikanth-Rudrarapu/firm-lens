@@ -1,0 +1,6 @@
+test_case_id,test_name,expected_fault,detected_fault,status,latency_ms,match
+BENCH-001,Live Fuzz Vector BENCH-001,Crash,Catastrophic Memory Corruption (Garbled Panic),Vulnerable,1007.24,True
+BENCH-002,Live Fuzz Vector BENCH-002,Crash,Catastrophic Memory Corruption (Garbled Panic),Vulnerable,1008.88,True
+BENCH-003,Live Fuzz Vector BENCH-003,Crash,Catastrophic Memory Corruption (Garbled Panic),Vulnerable,1032.61,True
+BENCH-004,Live Fuzz Vector BENCH-004,Crash,Catastrophic Memory Corruption (Garbled Panic),Vulnerable,1005.09,True
+BENCH-005,Live Fuzz Vector BENCH-005,Crash,Catastrophic Memory Corruption (Garbled Panic),Vulnerable,1110.2,True

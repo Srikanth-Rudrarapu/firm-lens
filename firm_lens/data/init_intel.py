@@ -62,10 +62,8 @@ def initialize_vulnerability_db():
 
     remediation_blueprints = [
         ("CWE-347", "Enforce hardware-rooted RSA/ECDSA asymmetric signature verification schemes. In your 'sdkconfig', explicitly toggle 'CONFIG_SECURE_BOOT_V2_ENABLED=y' and lock the public key digest irreversibly into the physical eFuse block."),
-        ("CWE-311", "Activate the built-in AES-256 transparent Flash Encryption engine. Ensure 'CONFIG_SECURE_FLASH_ENC_ENABLED=y' is enforced in the bootloader layout configuration so unencrypted application partitions cannot be dumped over UART physical diagnostic boundaries."),
-        ("CWE-1200", "Configure eFuse restriction parameters to permanently burn access lines. Strip physical JTAG debugging wires and disable direct ROM bootloader download commands ('CONFIG_SECURE_BOOT_DISABLE_ROM_DL_MODE=y') to mitigate runtime physical injection attacks."),
         ("CWE-798", "Purge raw credential values, private keys, and API tokens from code strings. Migrate secret data into an independent, encrypted NVS partition block or handle configuration handshakes dynamically using runtime encrypted key exchanges."),
-        ("CWE-312", "Never write plaintext credential artifacts to non-volatile flash buffers. Encrypt the target storage blocks using the Espressif NVS encryption utility API or migrate to runtime storage configurations that clear variables directly from volatile SRAM blocks upon power cycles."),
+        ("CWE-312", "Activate the built-in AES-256 transparent Flash Encryption engine ('CONFIG_SECURE_FLASH_ENC_ENABLED=y') to prevent UART physical diagnostic extraction. Never write plaintext credential artifacts to non-volatile flash buffers. Configure eFuse restriction parameters to permanently burn JTAG access lines and disable ROM bootloader download commands."),
         ("CWE-327", "Decommission outdated cryptographic signatures like MD5 or primitive XOR obfuscation tables. Refactor codebase routines to utilize strong, hardware-accelerated primitives such as SHA-256 or hardware-managed AES-GCM engine wrappers."),
         ("CWE-134", "Eliminate direct user-controlled arguments inside raw formatting output functions. Replace open format strings with safe positional bounds or rewrite direct print sinks to leverage explicitly protected length variables."),
         ("CWE-319", "Upgrade transport communication pathways from cleartext variants to transport-layer security wrappers. Replace 'mqtt://' and 'http://' endpoints with 'mqtts://' and 'https://' tracking structures, validating root CA arrays at runtime."),
@@ -74,10 +72,8 @@ def initialize_vulnerability_db():
 
     compliance_seeds = [
         ("CWE-347", "NIST SP 800-213 § 4.2.1 (Secure Device Boot Strapping)", "ETSI EN 303 645 Standard Audit Baseline"),
-        ("CWE-311", "NIST SP 800-213 § 4.2.1 (Secure Device Boot Strapping)", "ETSI EN 303 645 Standard Audit Baseline"),
-        ("CWE-1200", "NIST SP 800-213 Hardware Security Core", "ETSI EN 303 645 Physical Hardening Metrics"),
         ("CWE-798", "NIST SP 800-213 Data Protection Baseline", "ETSI EN 303 645 Compliance Rule 5.1-1 (No Hardcoded Credentials)"),
-        ("CWE-312", "NIST SP 800-213 Storage Security", "ETSI EN 303 645 Data Protection at Rest"),
+        ("CWE-312", "NIST SP 800-213 Storage Security (Hardware Enforcement)", "ETSI EN 303 645 Data Protection at Rest / Physical Hardening"),
         ("CWE-327", "NIST SP 800-213 Cryptographic Baseline", "ETSI EN 303 645 Cipher Compliance"),
         ("CWE-134", "NIST SP 800-213 Memory Safety Protection", "ETSI EN 303 645 Secure Software Development"),
         ("CWE-319", "NIST SP 800-213 Transport Security", "ETSI EN 303 645 Protection of Data in Transit"),

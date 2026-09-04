@@ -1,0 +1,59 @@
+{
+  "firmware_targets": {
+    "damn_vuln.bin": {
+      "sha256": "0543d922ae472a352a84b9a6ddee28d0f7864e3ffc644e4475f889bcc245557d",
+      "size_bytes": 4194304,
+      "size_mb": 4.0
+    },
+    "flash_dump.bin": {
+      "sha256": "b37ac536f9dc47aacde2fcd88f6122068374267077abe7aa9d4d85314b9e5d8a",
+      "size_bytes": 4194304,
+      "size_mb": 4.0
+    },
+    "forensic_target_image.bin": {
+      "sha256": "bfed0b1b4c1c116d4f9764fbb80a0f1af2f38b4d57b925f122f467489b8a419b",
+      "size_bytes": 4194304,
+      "size_mb": 4.0
+    },
+    "full_flash.bin": {
+      "sha256": "db1d6276ef1b75c861015f670111b4c7ebf442924e855882429cb903c4c6b796",
+      "size_bytes": 4194304,
+      "size_mb": 4.0
+    },
+    "hardware_extracted_flash.bin": {
+      "sha256": "b67352bab32345d605446ff9d36522cf48909b5c66409f0a07e08f0fe0e27864",
+      "size_bytes": 4194304,
+      "size_mb": 4.0
+    },
+    "tasmota32-bluetooth.bin": {
+      "sha256": "3ecd71cf18a838f56a4603e43320228a102d82c6e848917976e5115a8aa3ee0b",
+      "size_bytes": 1806320,
+      "size_mb": 1.72
+    },
+    "tasmota32-display.bin": {
+      "sha256": "521ad2628360c3c733f6f9c8ec2eb8c71ea9127779c7fcf0a67a3c0c6a3f879c",
+      "size_bytes": 1470304,
+      "size_mb": 1.4
+    },
+    "tasmota32-ir.bin": {
+      "sha256": "9eb373d175f41bad27f3c11490099bc44c2c933135b4e9ddfa90e9383a6784cf",
+      "size_bytes": 1440896,
+      "size_mb": 1.37
+    },
+    "tasmota32-webcam.bin": {
+      "sha256": "8e7854e9089afb5a181768f56cc1e2485c2cc1e0ae36c9db9b6653287b613a1b",
+      "size_bytes": 1376096,
+      "size_mb": 1.31
+    },
+    "tasmota32c2.bin": {
+      "sha256": "f9b06c2c9eceb86f6ab4960708fe8056b4c819d73c3bd033695f8d0d5564bdee",
+      "size_bytes": 2037360,
+      "size_mb": 1.94
+    },
+    "wifi.bin": {
+      "sha256": "28cc7efefc001c756f19839568cff445ca5be07a2a1d75270a294a02a58c1ec6",
+      "size_bytes": 9315629,
+      "size_mb": 8.88
+    }
+  }
+}

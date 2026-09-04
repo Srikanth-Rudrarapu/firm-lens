@@ -5,6 +5,7 @@ from rich.console import Console
 
 console = Console()
 
+
 class FirmLensHILMonitor:
     def __init__(self, port: str, baudrate: int = 115200):
         self.port = port
@@ -28,26 +29,59 @@ class FirmLensHILMonitor:
             return False
 
     def _monitor_loop(self):
-        app_has_started = False
-        while self.is_monitoring and self.serial_conn.is_open:
-            try:
-                line = self.serial_conn.readline().decode('utf-8', errors='ignore').strip()
-                if line:
-                    if not self.crash_detected.is_set():
-                        console.print(f"[dim white]ESP32> {line}[/dim white]")
-                    
-                    if "FirmLens HIL Target Active" in line:
-                        app_has_started = True
+        device_ready = False
 
-                    if ("Guru Meditation Error" in line or "abort() was called" in line or 
-                        "414141" in line or 
-                        (app_has_started and ("boot: ESP-IDF" in line or "Multicore bootloader" in line))):
-                        self.crash_detected.set()
-                    
-                    if self.crash_detected.is_set():
-                        self.crash_log.append(line)
-                        if len(self.crash_log) > 10:
-                            self.is_monitoring = False
+        panic_patterns = (
+            "guru meditation error",
+            "abort() was called",
+            "stack smashing protect",
+            "corrupt heap",
+            "double exception",
+            "backtrace:",
+            "loadprohibited",
+            "storeprohibited",
+            "instructionfetcherror",
+            "assert failed:",
+        )
+
+        reboot_patterns = (
+            "rst:0x",
+            "boot: 0x",
+            "configsip:",
+            "multicore bootloader",
+            "entry 0x",
+            "boot: esp-idf",
+        )
+
+        while self.is_monitoring and self.serial_conn and self.serial_conn.is_open:
+            try:
+                raw_line = self.serial_conn.readline()
+                if not raw_line:
+                    continue
+
+                line = raw_line.decode("utf-8", errors="ignore").strip()
+                if not line:
+                    continue
+
+                line_lower = line.lower()
+
+                if not self.crash_detected.is_set():
+                    console.print(f"[dim white]ESP32> {line}[/dim white]")
+
+                if not device_ready:
+                    if not any(pat in line_lower for pat in reboot_patterns):
+                        device_ready = True
+
+                if any(sig in line_lower for sig in panic_patterns) or "414141" in line_lower:
+                    self.crash_detected.set()
+                elif device_ready and any(sig in line_lower for sig in reboot_patterns):
+                    self.crash_detected.set()
+
+                if self.crash_detected.is_set():
+                    self.crash_log.append(line)
+                    if len(self.crash_log) >= 15:
+                        self.is_monitoring = False
+
             except Exception:
                 pass
 
@@ -60,7 +94,7 @@ class FirmLensHILMonitor:
 
     def stop(self):
         self.is_monitoring = False
-        if hasattr(self, 'thread'):
+        if hasattr(self, "thread"):
             self.thread.join(timeout=2)
         if self.serial_conn and self.serial_conn.is_open:
-            self.serial_conn.close()    
+            self.serial_conn.close()

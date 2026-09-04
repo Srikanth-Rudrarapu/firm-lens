@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.16)
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+set(CONFIG_PARTITION_TABLE_CUSTOM 1)
+set(CONFIG_PARTITION_TABLE_CUSTOM_FILENAME "partitions.csv")
+project(enterprise_gateway_v3)

@@ -1,0 +1,398 @@
+{
+  "summary": {
+    "total_targets": 11,
+    "micro_precision": 95.15,
+    "micro_recall": 100.0,
+    "micro_f1": 97.51,
+    "macro_precision": 95.87,
+    "macro_recall": 100.0,
+    "macro_f1": 97.84
+  },
+  "target_breakdown": {
+    "damn_vuln.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-311",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 10,
+      "fp": 1,
+      "fn": 0,
+      "precision": 90.91,
+      "recall": 100.0,
+      "f1_score": 95.24
+    },
+    "flash_dump.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-311",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 10,
+      "fp": 1,
+      "fn": 0,
+      "precision": 90.91,
+      "recall": 100.0,
+      "f1_score": 95.24
+    },
+    "forensic_target_image.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-311",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 10,
+      "fp": 1,
+      "fn": 0,
+      "precision": 90.91,
+      "recall": 100.0,
+      "f1_score": 95.24
+    },
+    "full_flash.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-311",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 10,
+      "fp": 1,
+      "fn": 0,
+      "precision": 90.91,
+      "recall": 100.0,
+      "f1_score": 95.24
+    },
+    "hardware_extracted_flash.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-1310",
+        "CWE-1329",
+        "CWE-134",
+        "CWE-311",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 10,
+      "fp": 1,
+      "fn": 0,
+      "precision": 90.91,
+      "recall": 100.0,
+      "f1_score": 95.24
+    },
+    "tasmota32-bluetooth.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    },
+    "tasmota32-display.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    },
+    "tasmota32-ir.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    },
+    "tasmota32-webcam.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    },
+    "tasmota32c2.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    },
+    "wifi.bin": {
+      "expected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "detected_cwes": [
+        "CWE-120",
+        "CWE-134",
+        "CWE-312",
+        "CWE-327",
+        "CWE-328",
+        "CWE-347",
+        "CWE-425",
+        "CWE-912"
+      ],
+      "tp": 8,
+      "fp": 0,
+      "fn": 0,
+      "precision": 100.0,
+      "recall": 100.0,
+      "f1_score": 100.0
+    }
+  },
+  "cwe_recall_breakdown": {
+    "CWE-120": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-1310": {
+      "expected": 5,
+      "detected": 5,
+      "recall": 100.0
+    },
+    "CWE-1329": {
+      "expected": 5,
+      "detected": 5,
+      "recall": 100.0
+    },
+    "CWE-134": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-312": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-327": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-328": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-347": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-425": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    },
+    "CWE-912": {
+      "expected": 11,
+      "detected": 11,
+      "recall": 100.0
+    }
+  }
+}

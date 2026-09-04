@@ -1,0 +1,34 @@
+{
+  "method": "Statistics computed from individual benchmark trial observations",
+  "targets": 11,
+  "trials_per_target": 10,
+  "total_trial_observations": 110,
+  "confidence_interval": "95% normal-approximation CI using 1.96 * SE",
+  "latency_seconds": {
+    "n": 110,
+    "mean": 0.823279,
+    "std_dev": 0.438135,
+    "median": 0.686287,
+    "min": 0.505362,
+    "max": 2.156,
+    "ci_95": 0.081878
+  },
+  "throughput_mb_s": {
+    "n": 110,
+    "mean": 3.896402,
+    "std_dev": 1.282834,
+    "median": 4.16077,
+    "min": 2.547652,
+    "max": 6.155778,
+    "ci_95": 0.239734
+  },
+  "peak_memory_mb": {
+    "n": 110,
+    "mean": 9.069023,
+    "std_dev": 2.585843,
+    "median": 8.807682,
+    "min": 6.092482,
+    "max": 15.451341,
+    "ci_95": 0.483239
+  }
+}

@@ -56,21 +56,20 @@ The system is optimized for Espressif ESP32-family firmware but is designed with
 
 ## Comparative Analysis and Project Scope
 
-The following comparison is provided for context, not as a claim of superiority over established tools. Each tool serves a different primary purpose:
+The following comparison is provided for context, not as a claim of superiority over established tools. The IEEE manuscript contains a condensed version of this table due to formatting constraints, but the detailed architectural differences are outlined below:
 
-| Feature | **FirmLens** | Binwalk | Firmadyne | Embark (EMBArk) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Primary Purpose** | ESP32 security analysis | Generic firmware extraction | Linux firmware emulation | EMBA web dashboard |
-| **ESP32 Partition Table Parser** | Semantic analysis | Signature extraction only | Not applicable | Not applicable |
-| **Live Hardware Extraction (UART)** | Supported | Not supported | Not supported | Not supported |
-| **HIL Fuzzing (Serial/Network)** | Supported | Not supported | Not supported | Not supported |
-| **CISA KEV + EPSS Correlation** | Supported | Not supported | Not supported | Not supported |
-| **CI/CD HTML / JSON Reports** | Supported | Not supported | Not supported | Supported (via EMBA) |
-| **Secure Boot / Flash Encryption Checks** | Supported | Not supported | Not supported | Not supported |
+| Feature | **FirmLens** | Binwalk | Firmadyne | EMBA |
+| :--- | :--- | :--- | :--- | :--- |
+| **Primary Focus** | Bare-metal ESP32 / RTOS security analysis | Generic binary extraction & signature matching | Full-system Linux firmware emulation | Embedded Linux filesystem security scanner |
+| **Bare-Metal Partition Parsing** | Semantic decoding (NVS, OTA, boot boundaries) | Magic-byte signature carving only | N/A (Requires POSIX structure) | N/A (Requires unpacked rootfs) |
+| **Dynamic Triage (UART/HIL)** | Physical UART crash & register panic parsing | Static file analysis only | Software emulation only | Static file analysis only |
+| **Hardware Boot Crypto Checks** | Validates RSA Secure Boot V2 & Flash Encryption | None | None | General Linux crypto config checks |
+| **Threat Intel Correlation** | Direct mapping to FIRST EPSS & CISA KEV | None | Dynamic network exploit validation | Vulners/NVD CVE matching |
+| **CI/CD & Performance** | Sub-second static scans with JSON/HTML reports | Fast execution with CLI/API output | Heavy software emulation overhead | Resource-intensive multi-engine scans |
 
-**Clarification**: Binwalk is a widely-used, mature extraction tool that has added ESP32 signatures. FirmLens does not replace Binwalk—rather, it complements it by providing **semantic, Espressif-specific security analysis** that Binwalk does not attempt. Firmadyne targets Linux-based firmware and is not designed for ESP32's FreeRTOS environment. Embark is a web front-end for EMBA, not a standalone analysis engine.
+**Clarification**: Binwalk is a widely-used, mature extraction tool that has added ESP32 signatures. FirmLens does not replace Binwalk—rather, it complements it by providing **semantic, Espressif-specific security analysis** that Binwalk does not attempt. Firmadyne targets Linux-based firmware and is not designed for ESP32's FreeRTOS environment. EMBA is a comprehensive multi-engine scanner for Linux root filesystems, but it cannot directly analyze monolithic bare-metal flash blobs compiled for Xtensa or RISC-V architectures without target-specific support.
 
-FirmLens occupies a distinct niche: **architectural semantic analysis for Espressif SoCs**, combining static binary inspection, live hardware extraction, and HIL fuzzing into a unified pipeline.
+FirmLens occupies a distinct niche: **architectural semantic analysis for Espressif SoCs**, combining static binary inspection, physical hardware evaluation, and threat intelligence into a unified pipeline.
 
 ---
 
@@ -90,13 +89,14 @@ pip install --upgrade firm-lens
 ```
 
 ### Option 2: Install from Source (Bleeding Edge)
-For security researchers who want the latest dynamic intelligence feeds and hardware fuzzing updates directly from the repository.
+For security researchers who want the latest dynamic intelligence feeds, or for academic peer reviewers intending to run the replication suite and generate evaluation figures.
 
 ```bash
 git clone https://github.com/Srikanth-Rudrarapu/firm-lens
 cd firm-lens
-pip install -e .
+pip install -e .[dev]
 ```
+*(Note: The `[dev]` flag installs the additional plotting and benchmarking libraries required to run the `experiments/` replication suite).*
 
 *Note on Hardware Drivers: For direct physical extraction and dynamic HIL fuzzing, ensure your host operating system has the appropriate USB-to-Serial bridge drivers installed (e.g., CP210x, FTDI).*
 
@@ -321,21 +321,27 @@ FirmLens follows Semantic Versioning (SemVer).
 
 FirmLens is an open-source firmware security analysis framework. If you use FirmLens in research, publications, technical reports, or security assessments, please cite:
 
+## Citation
+
+If you use FirmLens in your research or benchmarks, please cite the software artifact:
+
 ```bibtex
-@software{FirmLens,
-  author = {Rudrarapu, Srikanth},
-  title = {FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine},
-  year = {2026},
-  version = {1.0.2},
-  url = {https://github.com/Srikanth-Rudrarapu/firm-lens}
+@software{firmlens_software,
+  author    = {Rudrarapu, Srikanth},
+  title     = {FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine},
+  year      = {2026},
+  version   = {1.0.3},
+  url       = {https://github.com/Srikanth-Rudrarapu/firm-lens}
 }
 ```
+
+> *Note: The FirmLens empirical evaluation manuscript is currently under peer review; this citation block will be updated with the official publication details and DOI upon release.*
 
 ## Support the Project
 
 If you found FirmLens useful for your security research or compliance auditing, consider giving the repository a star on GitHub. It helps the project gain visibility and supports ongoing open-source development.
 
-[![GitHub stars](https://img.shields.io/github/stars/Srikanth-Rudrarapu/firm-lens.svg?style=social&label=Star)](https://github.com/Srikanth-Rudrarapu/firm-lens)
+[![GitHub stars](https://img.shields.io/github/stars/Srikanth-Rudrarapu/firm-lens.svg?style=social&label=Stars)](https://github.com/Srikanth-Rudrarapu/firm-lens)
 
 ## Disclaimer
 

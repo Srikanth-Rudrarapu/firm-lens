@@ -56,7 +56,7 @@ class ReportGenerator:
 
         self._cwe_fallback_registry = {
             "Missing Secure Boot Signature Sector": ["CWE-347"],
-            "Hardware Flash Encryption Appears Disabled": ["CWE-311", "CWE-1200"],
+            "Hardware Flash Encryption Appears Disabled": ["CWE-312"],
             "Private Key Marker Found in Firmware": ["CWE-321", "CWE-327"],
             "Hardcoded Static Credentials or Sensitive Secrets Exposed": ["CWE-798", "CWE-312"],
             "Cryptographic Engine Configuration Profile Identified": ["CWE-327", "CWE-328"],
@@ -81,17 +81,11 @@ class ReportGenerator:
         except Exception:
             return str(raw_offset)
 
-
-
     def _sanitize_telemetry(self, raw_id: str, raw_evidence: str) -> tuple:
         """Maps internal rule IDs to standard FirmLens IDs while preserving exact evidence."""
         secure_id = self._id_token_map.get(raw_id, raw_id)
-        
-        # Return the raw_evidence exactly as extracted by the analyzer
-        # so the user can validate the actual hardcoded secrets and endpoints.
         return secure_id, str(raw_evidence)
 
-   
     def _extract_fields(self, f: Any) -> tuple:
         if isinstance(f, dict):
             return (f.get("id", "FIRM-UNK"), f.get("severity", "Medium"), f.get("title", "Generic Vulnerability"), f.get("cwes", []), f.get("evidence", "-"), f.get("offset", "-"), f.get("remediation_blueprint", None))
@@ -116,12 +110,17 @@ class ReportGenerator:
         return ("REMEDIATION", blueprint_text)
     
     def _fetch_threat_intelligence(self, title: str, cwes: List[str], severity: str) -> dict:
+        """
+        Authoritative intelligence correlation.
+        Assigns live scores if found in SQLite threat cache; otherwise sets explicit null / N/A.
+        """
         intel = {
-            "active_exploitation": "No actively documented exploitation in the wild.",
-            "epss_score": "0.01% (Low risk of near-term weaponization)",
-            "epss_raw": 0.0001,  # Added raw float for JSON schema
+            "active_exploitation": "Not listed in CISA KEV Catalog",
+            "epss_score": "N/A",
+            "epss_raw": None,
             "nist_sp_800_213": "NIST SP 800-213 Data Protection Baseline",
-            "etsi_en_303_645": "ETSI EN 303 645 Standard Audit Baseline"
+            "etsi_en_303_645": "ETSI EN 303 645 Standard Audit Baseline",
+            "provenance_source": "Firmware Evidence / Local Audit"
         }
         
         try:
@@ -129,43 +128,46 @@ class ReportGenerator:
             if os.path.exists(db_path):
                 with sqlite3.connect(db_path) as conn:
                     cursor = conn.cursor()
-                    # Mapping Compliance
+                    # 1. Compliance Mappings
                     for cwe in cwes:
                         cursor.execute("SELECT nist_sp_800_213, etsi_en_303_645 FROM compliance_mappings WHERE UPPER(cwe_id) = ?", (str(cwe).strip().upper(),))
                         row = cursor.fetchone()
                         if row:
                             intel["nist_sp_800_213"], intel["etsi_en_303_645"] = row[0], row[1]
                             break
-                    # Mapping Live Threat Scores
+                            
+                    # 2. Live Threat Feed Cache
                     for cwe in cwes:
-                        cursor.execute("SELECT t.epss_score, t.kev_status FROM threat_intel_cache t JOIN cve_cwe_mapping m ON t.cve_id = m.cve_id WHERE UPPER(m.cwe_id) = ?", (str(cwe).strip().upper(),))
+                        cursor.execute(
+                            "SELECT t.epss_score, t.kev_status, t.cve_id FROM threat_intel_cache t "
+                            "JOIN cve_cwe_mapping m ON t.cve_id = m.cve_id "
+                            "WHERE UPPER(m.cwe_id) = ?", 
+                            (str(cwe).strip().upper(),)
+                        )
                         row = cursor.fetchone()
                         if row:
-                            intel["epss_score"] = f"{row[0] * 100:.2f}% (Live Threat Feed Cache)"
-                            intel["epss_raw"] = float(row[0])
-                            if row[1] == 1: intel["active_exploitation"] = "YES (Confirmed by CISA KEV Catalog metrics)"
+                            score_val = float(row[0])
+                            intel["epss_raw"] = score_val
+                            intel["epss_score"] = f"{score_val * 100:.2f}% (Live Threat Feed Cache)"
+                            if int(row[1]) == 1:
+                                intel["active_exploitation"] = "YES (Confirmed by CISA KEV Catalog)"
+                            else:
+                                intel["active_exploitation"] = "Not listed in CISA KEV Catalog"
+                            intel["provenance_source"] = f"NVD/FIRST/CISA Catalog via {row[2]}"
                             return intel
         except Exception:
             pass
 
-        # --- Contextual Physical Threat Fallback ---
+        # Contextual Physical Classification for hardware-bound findings
         physical_keywords = ["HARDWARE", "FLASH", "JTAG", "ENCRYPTION", "PARTITION", "BOOT", "OTA"]
         if any(k in title.upper() for k in physical_keywords):
             intel["epss_score"] = "N/A - Physical Hardware Vector (Not tracked by network EPSS)"
             intel["epss_raw"] = None
-            intel["active_exploitation"] = "Requires local device access"
+            intel["active_exploitation"] = "Requires local physical device access"
+            intel["provenance_source"] = "Physical Architecture Metric"
             return intel
 
-        # High-Fidelity Portfolio Fallbacks for Network Vectors
-        if str(severity).strip().lower() in ["high", "critical"]:
-            targets = ["CWE-798", "CWE-312", "CWE-120", "CWE-912", "CWE-347", "CWE-319", "CWE-425", "CWE-134"]
-            if any(cwe in cwes for cwe in targets) or any(k in title.upper() for k in ["SECRET", "CREDENTIAL", "FORMAT", "CLEARTEXT"]):
-                intel["active_exploitation"] = "YES (Confirmed by CISA KEV Catalog metrics)"
-                intel["epss_score"] = "87.4% (Critical predictive risk score of weaponization within 30 days)"
-                intel["epss_raw"] = 0.874
-
         return intel
-
 
     def _process_findings(self, results: Dict[str, List[Any]]) -> List[dict]:
         processed = []
@@ -180,27 +182,22 @@ class ReportGenerator:
                 title = str(title or "Unknown Vulnerability")
                 ev = self._sanitize_telemetry(str(f_id), str(ev))[1]
 
-               # ----- EVIDENCE SANITIZATION FOR REPORT -----
                 import re
                 import ast
                 
-                # 1. Grab the raw evidence
                 raw_ev = getattr(f, 'evidence', [])
-                
-                # 2. Self-Healing: If it's a stringified list ("['item']"), safely unpack it
                 if isinstance(raw_ev, str):
                     if raw_ev.startswith("['") and raw_ev.endswith("']"):
                         try:
                             raw_ev = ast.literal_eval(raw_ev)
-                        except:
+                        except Exception:
                             raw_ev = [raw_ev]
                     else:
                         raw_ev = [raw_ev]
 
-                # 3. Sanitize the clean native array
                 sanitized_ev = []
                 for e in raw_ev:
-                    e_str = str(e) # Only stringify the individual item, NEVER the list!
+                    e_str = str(e)
                     e_str = re.sub(r'%[0-9]*[sdxXunpclh]', '[format-spec]', e_str)
                     e_str = re.sub(r'(?i)(/(?:idf|lwip|components|esp-idf)+/[^\s]*)', '[path-omitted]', e_str)
                     sanitized_ev.append(e_str)
@@ -218,7 +215,6 @@ class ReportGenerator:
 
                 rem_type, rem_text = self._get_remediation(cwes_list, sev)
                 
-                # PREVENT DYNAMIC REMEDIATION OVERWRITE
                 if custom_rem:
                     rem_text = custom_rem
                     rem_type = "REMEDIATION"
@@ -248,7 +244,6 @@ class ReportGenerator:
             elif item["severity"] in ["Info", "Log"]: m["info_count"] += 1
         return m
 
-    
     def generate(self, results: Dict[str, List[Any]], fmt: str = None, explicit_path: str = None, filename: str = "firmware.bin", asset_name: str = None):
         normalized_results = {self._analyzer_domain_map.get(k, "General Security Audits"): v for k, v in results.items()}
         processed_data = self._process_findings(normalized_results)
@@ -257,7 +252,6 @@ class ReportGenerator:
         if fmt:
             for f in (["json", "html"] if fmt == "all" else [fmt]):
                 try:
-                    # STRICT PATH ROUTING LOGIC
                     base_out = explicit_path if explicit_path and not explicit_path.endswith(f".{f}") else os.path.join(os.path.expanduser("~"), "Downloads", "FirmLens_Reports")
                     
                     if explicit_path and explicit_path.endswith(f".{f}"):
@@ -266,15 +260,12 @@ class ReportGenerator:
                         target_path = os.path.join(base_out, f"{os.path.splitext(filename)[0]}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.{f}")
                     
                     os.makedirs(os.path.dirname(target_path), exist_ok=True)
-                    
-                    # ASSET NAME PARITY
                     display_asset = asset_name if asset_name else filename
 
                     if f == "json": self._generate_json(processed_data, target_path, display_asset)
                     elif f == "html": self._generate_html(processed_data, target_path, display_asset)
                 except Exception as e:
                     self.console.print(f"[error]File generation failed for {f}: {e}[/error]")
-
 
     def _get_severity_color(self, severity: str) -> str:
         return {"Critical": "bold red", "High": "red", "Medium": "yellow", "Low": "green", "Info": "cyan"}.get(severity, "white")
@@ -301,11 +292,7 @@ class ReportGenerator:
             self.console.print(f"  • Evidence: [italic]{item['evidence']}[/italic]")
             self.console.print(f"  • Offset: {item['offset']}\n")
 
-
     def _generate_json(self, processed: List[dict], path: str, asset_name: str):
-        import json
-        from datetime import datetime
-        
         metrics = self._calculate_metrics(processed)
         data = {
             "schema_version": "1.0.0",
@@ -327,7 +314,6 @@ class ReportGenerator:
         }
 
         for item in processed:
-            # Enforce clean CWE arrays and operational boolean flags
             is_vuln = True
             if "N/A" in item["cwes_str"] or "Operational" in item["cwes_str"]:
                 safe_cwes = []
@@ -335,7 +321,6 @@ class ReportGenerator:
             else:
                 safe_cwes = [str(c) for c in item.get("cwes_list", [])] if item.get("cwes_list") and item.get("cwes_list") != ["-"] else [item.get("cwes_str", "")]
 
-            # Map to strictly typed JSON telemetry variables
             active_exp_str = item["intel"].get("active_exploitation", "")
             mapped_exploitation = "unsupported" if "Requires" in active_exp_str else "active" if "YES" in active_exp_str else "inactive"
 
@@ -343,7 +328,8 @@ class ReportGenerator:
                 "active_exploitation": mapped_exploitation,
                 "epss_score": item["intel"].get("epss_raw", None),
                 "nist_sp_800_213": item["intel"].get("nist_sp_800_213", ""),
-                "etsi_en_303_645": item["intel"].get("etsi_en_303_645", "")
+                "etsi_en_303_645": item["intel"].get("etsi_en_303_645", ""),
+                "provenance_source": item["intel"].get("provenance_source", "Firmware Evidence")
             }
 
             data["findings"].append({
@@ -363,12 +349,9 @@ class ReportGenerator:
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
-            
             self.console.print(f"[success]Structured JSON Security Report Saved:[/success] {path}")
-            
         except Exception as e:
             self.console.print(f"[bold red]Error writing JSON report:[/bold red] {e}")
-
 
     def _generate_html(self, processed: List[dict], path: str, asset_name: str):
         metrics = self._calculate_metrics(processed)
@@ -398,11 +381,9 @@ class ReportGenerator:
             
             table { width: 100%; border-collapse: collapse; table-layout: fixed; margin-top: 15px; border-radius: 8px; overflow: hidden; }
             th { text-align: left; background: #6366f1; color: white; padding: 14px 12px; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; }
-           /* td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: top; word-wrap: break-word; color: #334155; } */
-           td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: top; word-wrap: break-word; word-break: normal; color: #334155; }
+            td { padding: 12px; border-bottom: 1px solid #f1f5f9; font-size: 0.9rem; vertical-align: top; word-wrap: break-word; word-break: normal; color: #334155; }
             .col-id { width: 12%; } .col-sev { width: 10%; } .col-title { width: 25%; } .col-cwe { width: 12%; } .col-off { width: 14%; } .col-ev { width: 17%; } .col-action { width: 10%; }
             
-            /* High-Visibility White-on-Pastel Industry Standard Severity Badges */
             .Critical { color: #ffffff; background: #b91c1c; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; text-transform: uppercase; display: inline-block; }
             .High { color: #ffffff; background: #ef4444; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; text-transform: uppercase; display: inline-block; }
             .Medium { color: #ffffff; background: #f97316; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; text-transform: uppercase; display: inline-block; }
@@ -410,22 +391,19 @@ class ReportGenerator:
             .Info { color: #ffffff; background: #2563eb; padding: 4px 10px; border-radius: 6px; font-weight: bold; font-size: 0.78rem; text-transform: uppercase; display: inline-block; }
             code { word-wrap: break-word; word-break: normal; overflow-wrap: anywhere; }
 
-            /* Clean formatting removing distracting code background shadows from segment offset and evidence blocks */
-            .table-offset-text { font-family: monospace; font-size: 0.85em; font-weight: 600; color: #475569; }
-            /* .table-evidence-text { font-family: monospace; font-size: 0.85em; color: #64748b; line-height: 1.3; } */
             .evidence-box {
-    white-space: pre-wrap;
-    word-wrap: break-word; /* Breaks only at spaces/hyphens */
-    word-break: normal;    /* Kills the ugly mid-word breaks */
-    overflow-wrap: break-word;
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #475569;
-    max-height: 250px;
-    overflow-y: auto;      /* Enables vertical scrolling */
-    display: block;        /* Crucial for scrolling inside table cells */
-    padding-right: 5px;
-}
+                white-space: pre-wrap;
+                word-wrap: break-word;
+                word-break: normal;
+                overflow-wrap: break-word;
+                font-family: monospace;
+                font-size: 0.85rem;
+                color: #475569;
+                max-height: 250px;
+                overflow-y: auto;
+                display: block;
+                padding-right: 5px;
+            }
             
             .rem-btn { background: #f1f5f9; border: 1px solid #cbd5e1; color: #475569; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.75rem; font-weight: 600; width: 100%; text-align: center; }
             .rem-btn:hover { background: #e2e8f0; color: #1e293b; }
@@ -487,15 +465,13 @@ class ReportGenerator:
                 ev_bullets = "<br>".join([f"&bull; {html.escape(str(e))}" for e in ev_list])
                 ev_display = f"{ev_header}{ev_bullets}"
 
-                # 1. Generate the main visible finding row
                 html_layout += f"<tr class='finding-row' id='{r_id}' data-severity='{i['severity']}'><td><strong>{i['id']}</strong></td><td><span class='{i['severity']}'>{i['severity'].upper()}</span></td><td>{html.escape(i['title'])}</td><td>{i['cwes_str']}</td><td><code style='word-break: break-all;'>{i['offset']}</code></td><td><div class='evidence-box'>{ev_display}</div></td><td><button class='rem-btn' onclick=\"toggleRemediation('{r_id}')\">{btn}</button></td></tr>"
                 
-                # --- THREAT INTELLIGENCE DASHBOARD BLOCK ---
                 intel = i.get('intel', {})
                 active_exp = str(intel.get('active_exploitation', 'N/A'))
                 epss = str(intel.get('epss_score', 'N/A'))
+                epss_raw_val = intel.get('epss_raw')
                 
-                # Dynamic Badges
                 if "YES" in active_exp.upper():
                     exp_badge = f"<span style='background: #fee2e2; color: #b91c1c; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; border: 1px solid #fca5a5; display: inline-block; letter-spacing: 0.05em;'>{html.escape(active_exp)}</span>"
                 elif "REQUIRES" in active_exp.upper():
@@ -503,9 +479,9 @@ class ReportGenerator:
                 else:
                     exp_badge = f"<span style='background: #f0fdf4; color: #15803d; padding: 4px 10px; border-radius: 6px; font-weight: 800; font-size: 0.75rem; border: 1px solid #bbf7d0; display: inline-block; letter-spacing: 0.05em;'>{html.escape(active_exp)}</span>"
 
-                if "Critical" in epss or "87.4%" in epss:
+                if epss_raw_val is not None and epss_raw_val >= 0.70:
                     epss_style = "color: #b91c1c; font-weight: 800; font-size: 0.9rem;"
-                elif "N/A" in epss:
+                elif epss == "N/A" or "N/A" in epss or epss_raw_val is None:
                     epss_style = "color: #64748b; font-style: italic;"
                 else:
                     epss_style = "color: #334155; font-weight: 700;"
@@ -513,7 +489,7 @@ class ReportGenerator:
                 intel_html = f"""
                 <div style='margin-top: 20px; padding: 20px; background: linear-gradient(145deg, #ffffff, #f8fafc); border: 1px solid #cbd5e1; border-radius: 10px; border-left: 5px solid #3b82f6; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);'>
                     <div style='margin-bottom: 15px; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px;'>
-                        <strong style='color:#0f172a; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;'>Live Threat Intelligence & Compliance Telemetry</strong>
+                        <strong style='color:#0f172a; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em;'>Threat Intelligence & Compliance Telemetry</strong>
                     </div>
                     <div style='display: grid; grid-template-columns: 240px 1fr; gap: 12px 20px; align-items: center; font-size: 0.85rem;'>
                         <div style='font-weight: 700; color: #64748b; text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.05em;'>EPSS Weaponization Probability:</div>
@@ -531,7 +507,6 @@ class ReportGenerator:
                 </div>
                 """
                 
-                # 2. INJECT THE MISSING HIDDEN REMEDIATION ROW (Now with Intel Data)
                 html_layout += f"<tr id='rem-{r_id}' class='remediation-row'><td colspan='7'><div class='remediation-box {b_class}'><div class='rem-title {t_class}'>{t_label}</div>{html.escape(str(i.get('rem_text', '')))}{intel_html}</div></td></tr>"
                 
             html_layout += "</table></div>"

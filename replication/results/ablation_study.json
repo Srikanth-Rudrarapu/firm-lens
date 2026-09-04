@@ -1,0 +1,123 @@
+[
+  {
+    "configuration": "Full Pipeline (Baseline)",
+    "excluded_module": "None",
+    "recall_pct": 100.0,
+    "precision_pct": 75.38,
+    "f1_score": 85.96,
+    "total_findings": 310,
+    "delta_recall_pct": 0.0,
+    "delta_findings": 0,
+    "execution_time_sec": 3.1767
+  },
+  {
+    "configuration": "Without ESP32PartitionAnalyzer",
+    "excluded_module": "ESP32PartitionAnalyzer",
+    "recall_pct": 89.8,
+    "precision_pct": 76.52,
+    "f1_score": 82.63,
+    "total_findings": 300,
+    "delta_recall_pct": -10.2,
+    "delta_findings": -10,
+    "execution_time_sec": 3.0142
+  },
+  {
+    "configuration": "Without SecretsAnalyzer",
+    "excluded_module": "SecretsAnalyzer",
+    "recall_pct": 100.0,
+    "precision_pct": 75.38,
+    "f1_score": 85.96,
+    "total_findings": 246,
+    "delta_recall_pct": 0.0,
+    "delta_findings": -64,
+    "execution_time_sec": 2.6891
+  },
+  {
+    "configuration": "Without CryptoAnalyzer",
+    "excluded_module": "CryptoAnalyzer",
+    "recall_pct": 84.69,
+    "precision_pct": 72.17,
+    "f1_score": 77.93,
+    "total_findings": 229,
+    "delta_recall_pct": -15.31,
+    "delta_findings": -81,
+    "execution_time_sec": 2.4195
+  },
+  {
+    "configuration": "Without FlashEncryptionAnalyzer",
+    "excluded_module": "FlashEncryptionAnalyzer",
+    "recall_pct": 93.88,
+    "precision_pct": 74.19,
+    "f1_score": 82.88,
+    "total_findings": 299,
+    "delta_recall_pct": -6.12,
+    "delta_findings": -11,
+    "execution_time_sec": 2.6683
+  },
+  {
+    "configuration": "Without SecureBootAnalyzer",
+    "excluded_module": "SecureBootAnalyzer",
+    "recall_pct": 88.78,
+    "precision_pct": 73.11,
+    "f1_score": 80.18,
+    "total_findings": 289,
+    "delta_recall_pct": -11.22,
+    "delta_findings": -21,
+    "execution_time_sec": 3.1643
+  },
+  {
+    "configuration": "Without BackdoorAnalyzer",
+    "excluded_module": "BackdoorAnalyzer",
+    "recall_pct": 77.55,
+    "precision_pct": 70.37,
+    "f1_score": 73.79,
+    "total_findings": 296,
+    "delta_recall_pct": -22.45,
+    "delta_findings": -14,
+    "execution_time_sec": 3.125
+  },
+  {
+    "configuration": "Without DangerousFunctionAnalyzer",
+    "excluded_module": "DangerousFunctionAnalyzer",
+    "recall_pct": 77.55,
+    "precision_pct": 70.37,
+    "f1_score": 73.79,
+    "total_findings": 278,
+    "delta_recall_pct": -22.45,
+    "delta_findings": -32,
+    "execution_time_sec": 2.2676
+  },
+  {
+    "configuration": "Without FingerprintAnalyzer",
+    "excluded_module": "FingerprintAnalyzer",
+    "recall_pct": 100.0,
+    "precision_pct": 75.38,
+    "f1_score": 85.96,
+    "total_findings": 310,
+    "delta_recall_pct": 0.0,
+    "delta_findings": 0,
+    "execution_time_sec": 3.1656
+  },
+  {
+    "configuration": "Without InsecureEndpointAnalyzer",
+    "excluded_module": "InsecureEndpointAnalyzer",
+    "recall_pct": 100.0,
+    "precision_pct": 95.15,
+    "f1_score": 97.51,
+    "total_findings": 240,
+    "delta_recall_pct": 0.0,
+    "delta_findings": -70,
+    "execution_time_sec": 2.7064
+  },
+  {
+    "configuration": "Without WeakXORAnalyzer",
+    "excluded_module": "WeakXORAnalyzer",
+    "recall_pct": 100.0,
+    "precision_pct": 75.38,
+    "f1_score": 85.96,
+    "total_findings": 303,
+    "delta_recall_pct": 0.0,
+    "delta_findings": -7,
+    "execution_time_sec": 3.1373
+  }
+]

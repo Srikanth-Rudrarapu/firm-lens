@@ -1,0 +1,56 @@
+{
+  "mode": "live_hil",
+  "serial_port": "/dev/cu.usbserial-0001",
+  "baudrate": 115200,
+  "total_cases": 5,
+  "faults_detected": 5,
+  "fault_detection_rate_pct": 100.0,
+  "note": "Live HIL vectors are reported as fault-detection observations. Exact fault-type accuracy, precision, recall, and F1 are not claimed because independent per-vector ground-truth labels are not established by the current live benchmark harness.",
+  "results": [
+    {
+      "test_case_id": "BENCH-001",
+      "test_name": "Live Fuzz Vector BENCH-001",
+      "expected_fault": "Crash",
+      "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
+      "status": "Vulnerable",
+      "latency_ms": 1007.24,
+      "match": true
+    },
+    {
+      "test_case_id": "BENCH-002",
+      "test_name": "Live Fuzz Vector BENCH-002",
+      "expected_fault": "Crash",
+      "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
+      "status": "Vulnerable",
+      "latency_ms": 1008.88,
+      "match": true
+    },
+    {
+      "test_case_id": "BENCH-003",
+      "test_name": "Live Fuzz Vector BENCH-003",
+      "expected_fault": "Crash",
+      "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
+      "status": "Vulnerable",
+      "latency_ms": 1032.61,
+      "match": true
+    },
+    {
+      "test_case_id": "BENCH-004",
+      "test_name": "Live Fuzz Vector BENCH-004",
+      "expected_fault": "Crash",
+      "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
+      "status": "Vulnerable",
+      "latency_ms": 1005.09,
+      "match": true
+    },
+    {
+      "test_case_id": "BENCH-005",
+      "test_name": "Live Fuzz Vector BENCH-005",
+      "expected_fault": "Crash",
+      "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
+      "status": "Vulnerable",
+      "latency_ms": 1110.2,
+      "match": true
+    }
+  ]
+}

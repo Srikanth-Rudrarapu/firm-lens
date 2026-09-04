@@ -1,0 +1,22 @@
+{
+  "dataset_metadata": {
+    "version": "1.1.0",
+    "description": "Harmonized ground-truth vulnerability inventory for controlled ESP32 firmware evaluation (N=11)",
+    "total_targets": 11,
+    "synthetic_targets": 6,
+    "open_source_operational_targets": 5
+  },
+  "cwe_taxonomy": [
+    { "cwe_id": "CWE-120", "class": "Classic Buffer Overflow" },
+    { "cwe_id": "CWE-134", "class": "Use of Externally-Controlled Format String" },
+    { "cwe_id": "CWE-200", "class": "Exposure of Sensitive Information" },
+    { "cwe_id": "CWE-312", "class": "Cleartext Storage of Sensitive Information" },
+    { "cwe_id": "CWE-327", "class": "Use of Broken or Risky Cryptographic Algorithm" },
+    { "cwe_id": "CWE-328", "class": "Use of Weak Hash" },
+    { "cwe_id": "CWE-347", "class": "Improper Verification of Cryptographic Signature" },
+    { "cwe_id": "CWE-425", "class": "Direct Request (Forced Browsing / Debug Endpoints)" },
+    { "cwe_id": "CWE-912", "class": "Hidden Functionality / Backdoor" },
+    { "cwe_id": "CWE-1310", "class": "Missing Key Management and Access Protections" },
+    { "cwe_id": "CWE-1329", "class": "Reliance on Component with Open Core Implementation" }
+  ]
+}

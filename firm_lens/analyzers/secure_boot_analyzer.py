@@ -9,37 +9,41 @@ class SecureBootAnalyzer:
         findings: List[Finding] = []
         raw_data = firmware_map.get("raw_binary", b"")
 
-        if not raw_data or len(raw_data) < 0x2000:
+        if not raw_data or len(raw_data) < 0x100:
             return findings
 
         try:
-            boot_offset = 0x1000
-            header_slice = raw_data[boot_offset : boot_offset + 4]
-            
-            if len(header_slice) >= 2:
-                magic_byte, segment_count = struct.unpack("<BB", header_slice[0:2])
-                if magic_byte == 0xE9:
-                    findings.append(Finding(
-                        id="FL-BOOT-HEADER",
-                         #Eevidence is explicitly dynamic based on read values
-                        evidence=f"ESP32 Image Header Verified at {hex(boot_offset)} -> Magic Byte: {hex(magic_byte)} | Active Segments: {segment_count}",
-                        offset=hex(boot_offset)
-                    ))
+            # Check both 0x0000 (app image) and 0x1000 (full flash dump bootloader)
+            valid_header_offset = None
+            for candidate_offset in [0x0000, 0x1000]:
+                if len(raw_data) >= candidate_offset + 4:
+                    magic_byte, segment_count = struct.unpack("<BB", raw_data[candidate_offset : candidate_offset + 2])
+                    if magic_byte == 0xE9:
+                        valid_header_offset = candidate_offset
+                        findings.append(Finding(
+                            id="FL-BOOT-HEADER",
+                            evidence=f"ESP32 Image Header Verified at {hex(candidate_offset)} -> Magic Byte: {hex(magic_byte)} | Active Segments: {segment_count}",
+                            offset=hex(candidate_offset)
+                        ))
+                        break
 
+            # Analyze Secure Boot Signature presence
             image_length = len(raw_data)
-            trailer_offset = image_length - 4096
-            
-            if trailer_offset > 0:
-                signature_block = raw_data[trailer_offset:]
-                # Verify if the block is entirely empty
-                if signature_block == b"\xFF" * 4096 or signature_block == b"\x00" * 4096:
-                    pad_type = "0xFF (Erased Flash)" if signature_block[0] == 0xFF else "0x00 (Null Padding)"
-                    
-                    findings.append(Finding(
-                        id="FL-BOOT-SIGNATURE",
-                        evidence=f"Signature Block Analysis at {hex(trailer_offset)}: Expected 4096-byte RSA/ECDSA signature, but found {pad_type}.",
-                        offset=hex(trailer_offset)
-                    ))
+            has_sbv2_sig = False
+
+            # Standard Secure Boot V2 signature sector magic (0xE7) check across image trailer
+            trailer_offset = max(0, image_length - 4096)
+            signature_block = raw_data[trailer_offset:]
+
+            if b"\xe7" in signature_block[:16]:
+                has_sbv2_sig = True
+
+            if not has_sbv2_sig:
+                findings.append(Finding(
+                    id="FL-BOOT-SIGNATURE",
+                    evidence=f"Signature Block Analysis: No hardware-rooted Secure Boot (V2 0xE7) signature sector discovered in image trailer (evaluated at {hex(trailer_offset)}).",
+                    offset=hex(trailer_offset)
+                ))
 
         except Exception:
             pass

@@ -1,0 +1,6 @@
+test_case_id,description,payload_bytes,latency_sec,network_delivered,network_status,hardware_state,fault_type,instruction_pointer
+WIFI-FUZZ-001,HTTP Baseline Probe,37,2.0956,True,Received 0 bytes response,Vulnerable,Catastrophic Memory Corruption (Garbled Panic),Overwritten / Unrecoverable
+WIFI-FUZZ-002,Oversized URI Buffer (1000B),1037,3.0142,True,Payload sent (No response / Timeout),Clean,None,N/A
+WIFI-FUZZ-003,HTTP Header Format String,40,3.0178,True,Payload sent (No response / Timeout),Clean,None,N/A
+WIFI-FUZZ-004,Malformed Content-Length Smuggling,39,1.0047,False,Socket Exception: OSError - [Errno 51] Network is unreachable,Clean,None,N/A
+WIFI-FUZZ-005,Raw TCP Binary Junk Flood (2000B),2000,1.0197,False,Socket Exception: ConnectionResetError - [Errno 54] Connection reset by peer,Clean,None,N/A

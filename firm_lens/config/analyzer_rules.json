@@ -20,7 +20,7 @@
     "FL-HARD-ENCRYPTION": {
         "title": "Hardware Flash Encryption Appears Disabled",
         "base_severity": "High",
-        "cwes": ["CWE-311", "CWE-1200"],
+        "cwes": ["CWE-312"],
         "description": "The computed global block entropy density scores drop far below production thresholds. Plaintext data blocks indicate the transparent hardware cryptographic flash encryption core is disengaged."
     },
     "FL-CRED-HARDCODED": {

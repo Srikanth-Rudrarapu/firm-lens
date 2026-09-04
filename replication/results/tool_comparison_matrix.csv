@@ -1,0 +1,5 @@
+tool,target_paradigm,analysis_type,esp32_partition_table_validation,hardware_boot_crypto_audit,dynamic_crash_hil_classification,threat_intel_enrichment,monolithic_rtos_support,mean_analysis_latency
+FirmLens (Proposed),Bare-Metal / FreeRTOS (ESP32 Xtensa/RISC-V),Static Semantic + Dynamic HIL,Yes (Semantic OTA/NVS/Offset Validation),"Yes (Secure Boot V2, Flash Enc, Weak Primitives)",Yes (Real-time UART Panic/Canary Triage),Yes (Real-time EPSS + CISA KEV),Full Native Support,< 1.0s
+Binwalk (v2.3+),Architecture Agnostic (File Formats),Static Signature Carving,No (Magic Byte Carving Only),No,No,No,Partial (Header Extraction Only),< 1.0s
+Firmadyne,"Linux OS (MIPS, ARM, x86)",Dynamic Full-System Emulation,No (Incompatible with Bare-Metal),No,No (Linux Kernel Dependent),No,Unsupported (Fails on Non-Linux RTOS),> 300.0s (Fails)
+EMBA / EMBArk,Linux OS RootFS (Multi-arch),Static Multi-Tool + User-Mode Emulation,No (Incompatible with Bare-Metal),Partial (Generic User-space Key String Matching),No (QEMU Linux User Space Only),Partial (cve-search on Linux Binaries),Unsupported (Designed for POSIX Tree),> 180.0s (Fails)
