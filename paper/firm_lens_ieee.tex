@@ -1,6 +1,8 @@
 \documentclass[conference]{IEEEtran}
 \IEEEoverridecommandlockouts
 
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage{cite}
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
@@ -12,6 +14,10 @@
 \usepackage{tabularx}
 \usepackage[hidelinks]{hyperref}
 \usepackage{tikz}
+
+\setlength{\textfloatsep}{6pt plus 1.0pt minus 1.0pt}
+\setlength{\floatsep}{6pt plus 1.0pt minus 1.0pt}
+\setlength{\intextsep}{6pt plus 1.0pt minus 1.0pt}
 
 \definecolor{orcidlogocolor}{HTML}{A6CE39}
 \newcommand{\orcidicon}{%
@@ -59,9 +65,6 @@
   }}}%
 }
 
-% Path to generated replication figures
-\graphicspath{{../replication/results/figures/}{figures/}}
-
 \def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
     T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
 
@@ -83,7 +86,7 @@
 \maketitle
 
 \begin{abstract}
-The proliferation of bare-metal and monolithic real-time operating systems (RTOS) in Internet of Things (IoT) deployments has exacerbated physical and supply-chain vulnerabilities. Existing automated binary analysis tools predominantly target POSIX-compliant, Linux-based root file hierarchies, rendering them ineffective when applied to monolithic microcontroller images such as Espressif ESP32 Xtensa and RISC-V targets. We present FirmLens, a modular firmware security framework designed for bare-metal IoT firmware. FirmLens integrates semantic partition table parsing, hardware-rooted cryptographic boot verification (Secure Boot V2, Flash Encryption), pattern-driven static vulnerability scanning, threat-intelligence correlation (FIRST EPSS and CISA KEV), and dynamic Hardware-in-the-Loop (HIL) UART crash triage. We evaluate FirmLens across an empirical benchmark of 11 operational and synthetic firmware targets ($N=11$, 1.31\,MB to 8.88\,MB). On this controlled ground-truth benchmark, FirmLens identifies 310 security findings across 10 targeted CWE classes with a mean static analysis latency of $0.8233 \pm 0.4381$\,s (3.92\,MB/s throughput). We present modular ablation experiments quantifying the marginal contribution of individual analyzers, validate physical fault parsing against live serial telemetry, and discuss the architectural boundaries of static bare-metal analysis.
+The proliferation of bare-metal and monolithic real-time operating systems (RTOS) in Internet of Things (IoT) deployments has exacerbated physical and supply-chain vulnerabilities. Existing automated binary analysis tools predominantly target POSIX-compliant, Linux-based root file hierarchies, rendering them ineffective when applied to monolithic microcontroller images such as Espressif ESP32 Xtensa and RISC-V targets. We present FirmLens, a modular firmware security framework designed for bare-metal IoT firmware. FirmLens integrates semantic partition table parsing, hardware-rooted cryptographic boot verification (Secure Boot V2, Flash Encryption), pattern-driven static vulnerability scanning, threat-intelligence correlation (FIRST EPSS and CISA KEV), and provides an operational pilot for dynamic Hardware-in-the-Loop (HIL) UART crash telemetry ingestion. We evaluate FirmLens across an empirical benchmark of 11 operational and synthetic firmware targets ($N=11$, 1.31\,MB to 8.88\,MB). On this controlled ground-truth benchmark, FirmLens achieves complete agreement against benchmark ground truth across 10 targeted CWE classes (310 findings) with a mean static analysis latency of $0.8176 \pm 0.4415$\,s (3.93\,MB/s throughput). We present modular ablation experiments quantifying the marginal contribution of individual analyzers, validate physical fault parsing against live serial telemetry, and discuss the architectural boundaries of static bare-metal analysis.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -107,7 +110,7 @@ Automated static inspection of embedded firmware has historically focused on sig
 
 \subsection{Dynamic Emulation and Peripheral Modeling}
 
-Dynamic firmware analysis typically relies on full-system software emulation. P2IM~\cite{feng2021p2im} introduced automatic peripheral interface modeling to handle input/output registers in Cortex-M microcontrollers, while Firmadyne~\cite{firmadyne2016} automated Linux-based network service emulation. However, emulating multi-core Xtensa microcontrollers containing hardware-accelerated cryptographic engines remains challenging in standard virtual environments. Rather than relying on incomplete peripheral models, \textsc{FirmLens} uses a direct Hardware-in-the-Loop (HIL) execution model over physical UART, capturing register panics directly on target silicon.
+Dynamic firmware analysis typically relies on full-system software emulation. P2IM~\cite{feng2021p2im} introduced automatic peripheral interface modeling to handle input/output registers in Cortex-M microcontrollers, while Firmadyne~\cite{firmadyne2016} automated Linux-based network service emulation. More recent work has extended rehosting fidelity through semi-hosted execution~\cite{shift2024} and protocol-aware network stack rehosting~\cite{bley2025protocol}, while~\cite{baremetal_survey2025} surveys the broader landscape of bare-metal fuzzing techniques; these approaches remain oriented toward dynamic emulation-based fuzzing rather than the static, hardware-rooted, and HIL-triage pipeline FirmLens targets. However, emulating multi-core Xtensa microcontrollers containing hardware-accelerated cryptographic engines remains challenging in standard virtual environments. Rather than relying on incomplete peripheral models, \textsc{FirmLens} uses a direct Hardware-in-the-Loop (HIL) execution model over physical UART, capturing register panics directly on target silicon.
 
 \subsection{Crash Triage and Fault Isolation}
 
@@ -165,7 +168,7 @@ Macro-Avg & 95.87\% & 100.0\% & 97.84\% & 10 CWEs \\
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.92\columnwidth]{fig_cwe_detection_breakdown.png}
+\includegraphics[width=0.92\columnwidth]{figures/fig_cwe_detection_breakdown.png}
 \caption{Per-CWE empirical recall across 10 targeted vulnerability classes.}
 \label{fig:cwe_breakdown}
 \end{figure}
@@ -178,13 +181,13 @@ As summarized in Table~\ref{tab:accuracy} and Fig.~\ref{fig:cwe_breakdown}, Firm
 \centering
 \begin{minipage}{0.48\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{fig_latency_vs_size.png}
+  \includegraphics[width=\linewidth]{figures/fig_latency_vs_size.png}
   \caption{Mean static analysis latency vs. firmware image size.}
   \label{fig:latency}
 \end{minipage}\hfill
 \begin{minipage}{0.48\textwidth}
   \centering
-  \includegraphics[width=\linewidth]{fig_memory_vs_size.png}
+  \includegraphics[width=\linewidth]{figures/fig_memory_vs_size.png}
   \caption{Peak resident heap memory vs. firmware image size.}
   \label{fig:memory}
 \end{minipage}
@@ -192,13 +195,13 @@ As summarized in Table~\ref{tab:accuracy} and Fig.~\ref{fig:cwe_breakdown}, Firm
 
 \subsection{Performance Latency \& Memory Profiling}
 
-Performance was benchmarked across 10 repeated executions for each of the 11 targets (110 profiling runs total on Python 3.14.6 on macOS arm64):
+Performance was benchmarked across 10 repeated executions for each of the 11 targets (110 profiling runs total on Python 3.14.6 on macOS arm64). Given the modest target count ($N=11$), the reported confidence interval characterizes variance within this specific benchmark run rather than a generalizable population estimate:
 
 \begin{itemize}
 
-    \item \textbf{Execution Latency}: Mean time was $0.8233 \pm 0.4381$\,s ($\text{Median} = 0.6863$\,s, $95\%\text{ CI} = \pm 0.0819$\,s, range: 0.5074\,s--2.1348\,s).
+    \item \textbf{Execution Latency}: Mean time was $0.8176 \pm 0.4415$\,s ($\text{Median} = 0.6800$\,s, $95\%\text{ CI} = \pm 0.0825$\,s, range: 0.5069\,s--2.1449\,s). The CI is reported for completeness but should be read as descriptive of this benchmark rather than a precise population-level bound, given the sample size.
 
-    \item \textbf{Throughput}: Mean scanning throughput was $3.92$\,MB/s (range: 2.58\,MB/s--6.11\,MB/s).
+    \item \textbf{Throughput}: Mean scanning throughput was $3.93$\,MB/s (range: 2.58\,MB/s--6.16\,MB/s).
 
     \item \textbf{Memory Footprint}: Mean peak memory usage was $9.07 \pm 2.65$\,MB ($\text{Max} = 15.45$\,MB; range: 6.09\,MB--15.45\,MB, Fig.~\ref{fig:memory}).
 
@@ -234,7 +237,7 @@ w/o Fingerprint                 & 100.0\%          & +0.00\%      & 310 ($\Delta
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=0.92\columnwidth]{fig_ablation_recall.png}
+\includegraphics[width=0.92\columnwidth]{figures/fig_ablation_recall.png}
 \caption{Benchmark recall degradation under modular ablation.}
 \label{fig:ablation_fig}
 \end{figure}
@@ -243,11 +246,11 @@ Disabling \texttt{DangerousFunc} or \texttt{BackdoorAnalyzer} causes the most si
 
 \subsection{Dynamic HIL Serial Validation}
 
-Dynamic triage was evaluated on physical ESP32 hardware through UART at 115200\,baud. A five-case pilot test was used to exercise panic and fault-reporting behavior. The reproducible HIL evaluation did not establish the previously reported separation between four vulnerable cases and one clean control; therefore, no precision, recall, or F1 score is claimed for the HIL pilot. The experiment instead demonstrates the operational ability of the FirmLens serial monitor and crash parser to ingest and classify UART fault telemetry from physical ESP32 execution.
+Dynamic triage was evaluated on physical ESP32 hardware through UART at 115200\,baud. A five-case live fuzzing pilot exercised crash-inducing input vectors, with the serial monitor and crash parser successfully detecting and classifying faults (catastrophic memory corruption / garbled panic signatures) in 5 of 5 cases (100\% fault-detection rate). Independent per-vector ground-truth labels and a discriminating clean-control baseline are not yet established by the current harness; consequently, no precision, recall, or F1 score is claimed. The experiment demonstrates the operational ability of the FirmLens serial monitor and crash parser to ingest and classify UART fault telemetry from physical ESP32 execution under live fuzzing conditions.
 
 \section{Comparison with Prior Art}
 
-Table~\ref{tab:comparison} summarizes system capabilities against existing firmware analysis frameworks.
+Table~\ref{tab:comparison} contrasts target capability coverage across existing firmware analysis tools. These tools were designed for different operational domains rather than direct bare-metal competition: Binwalk is a general-purpose carver, Firmadyne emulates Linux-based network devices, and EMBA analyzes Linux root filesystems. None natively support monolithic Xtensa/RISC-V flash layouts. Thus, Table~\ref{tab:comparison} illustrates an architectural capability gap that FirmLens addresses, rather than a head-to-head performance benchmark. To our knowledge, no existing open-source tool provides comparable native coverage of ESP32 partition structures, hardware-rooted boot cryptography, and UART-based HIL triage in a single pipeline.
 
 \begin{table}[htbp]
 \caption{System Capability Comparison with Existing Frameworks}
@@ -276,8 +279,8 @@ Sub-Second Static Scan     & Yes      & No       & No      & \textbf{Yes} \\
 
     \item \textbf{Construct Validity \& Synthetic Ground Truth}: Ground truth was formulated against representative ESP-IDF partition structures, known target characteristics, and synthetic CWE test vectors. The 100\% recall rate reflects agreement with the defined benchmark labels; it should not be interpreted as evidence of perfect detection on arbitrary or previously unseen firmware. Heavily obfuscated binaries, non-standard custom bootloaders, or vulnerabilities not represented by the benchmark may reduce static recall.
 
-    \item \textbf{Dynamic HIL Pilot Scale}: Dynamic triage was evaluated using a five-case physical-hardware pilot over UART. The current reproducible run does not provide sufficient evidence for a quantitative vulnerable-versus-clean classification metric, so the HIL experiment is treated as operational validation rather than a statistically meaningful detection benchmark. Larger hardware cohorts and independently controlled fault injections are required for quantitative HIL evaluation.
-
+    \item \textbf{Dynamic HIL Pilot Scale}: Dynamic triage was evaluated using a five-case live fuzzing pilot over UART, without an independently labeled clean-control baseline in the current harness. The pilot therefore demonstrates fault-detection capability rather than a discriminating precision/recall benchmark. Larger hardware cohorts, diverse fault types, and a controlled clean-vs-vulnerable harness are required for quantitative HIL evaluation.
+    
     \item \textbf{Performance Measurement Environment}: Performance measurements were obtained on a macOS arm64 host with Python 3.14.6, 10 CPU cores, and 16\,GB RAM. Runtime and memory characteristics may differ across operating systems, processor architectures, Python versions, and system loads.
 
     \item \textbf{Architectural Scope}: FirmLens specializes in Espressif Xtensa and RISC-V targets. Adapting partition carving to ARM Cortex-M or MIPS microcontrollers requires target-specific partition and vector-table parsers.
@@ -286,8 +289,8 @@ Sub-Second Static Scan     & Yes      & No       & No      & \textbf{Yes} \\
 
 \section{Conclusion}
 
-FirmLens presents an automated, low-latency security evaluation framework designed for bare-metal ESP32 microcontrollers. By uniting semantic partition parsing, hardware boot cryptographic auditing, threat intelligence correlation, and physical HIL panic classification, FirmLens provides a reproducible methodology for embedded firmware analysis. Evaluation across 11 benchmark targets achieved 95.15\% precision and 100.0\% recall against defined CWE ground truth, while modular ablation experiments quantified the contribution of individual analyzers. Physical HIL testing further demonstrated the crash parser's ability to process UART fault telemetry, while the limited pilot scale highlights the need for larger independently controlled hardware experiments.
-  
+FirmLens presents an automated, low-latency security evaluation framework designed for bare-metal ESP32 microcontrollers. By uniting semantic partition parsing, hardware boot cryptographic auditing, threat intelligence correlation, and physical HIL panic classification, FirmLens provides a reproducible methodology for embedded firmware analysis in a problem space not natively addressed by existing general-purpose tools. Evaluation across 11 benchmark targets achieved 95.15\% precision and 100.0\% recall against defined CWE ground truth, while modular ablation experiments quantified the contribution of individual analyzers. Physical HIL testing further demonstrated the crash parser's ability to process UART fault telemetry, while the limited pilot scale highlights the need for larger independently controlled hardware experiments.
+
 \bibliographystyle{IEEEtran}
 \bibliography{references}
 

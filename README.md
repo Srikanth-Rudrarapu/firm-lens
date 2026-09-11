@@ -319,23 +319,19 @@ FirmLens follows Semantic Versioning (SemVer).
 
 ## Citation
 
-FirmLens is an open-source firmware security analysis framework. If you use FirmLens in research, publications, technical reports, or security assessments, please cite:
-
-## Citation
-
-If you use FirmLens in your research or benchmarks, please cite the software artifact:
+FirmLens is an open-source firmware security analysis framework. If you use FirmLens in research, publications, technical reports, or security assessments, please cite the software artifact:
 
 ```bibtex
 @software{firmlens_software,
   author    = {Rudrarapu, Srikanth},
   title     = {FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine},
   year      = {2026},
-  version   = {1.0.3},
+  version   = {1.0.4},
   url       = {https://github.com/Srikanth-Rudrarapu/firm-lens}
 }
 ```
 
-> *Note: The FirmLens empirical evaluation manuscript is currently under peer review; this citation block will be updated with the official publication details and DOI upon release.*
+> *An empirical evaluation manuscript describing FirmLens is in preparation. For the latest publication status and citation (preprint/DOI, once available), see [CITATION.cff](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.cff) or [CITATION.bib](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.bib), which are kept current independent of software releases.*
 
 ## Support the Project
 

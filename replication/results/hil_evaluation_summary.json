@@ -13,7 +13,7 @@
       "expected_fault": "Crash",
       "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
       "status": "Vulnerable",
-      "latency_ms": 1007.24,
+      "latency_ms": 1007.41,
       "match": true
     },
     {
@@ -22,7 +22,7 @@
       "expected_fault": "Crash",
       "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
       "status": "Vulnerable",
-      "latency_ms": 1008.88,
+      "latency_ms": 1013.02,
       "match": true
     },
     {
@@ -31,7 +31,7 @@
       "expected_fault": "Crash",
       "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
       "status": "Vulnerable",
-      "latency_ms": 1032.61,
+      "latency_ms": 1032.33,
       "match": true
     },
     {
@@ -40,7 +40,7 @@
       "expected_fault": "Crash",
       "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
       "status": "Vulnerable",
-      "latency_ms": 1005.09,
+      "latency_ms": 1007.37,
       "match": true
     },
     {
@@ -49,7 +49,7 @@
       "expected_fault": "Crash",
       "detected_fault": "Catastrophic Memory Corruption (Garbled Panic)",
       "status": "Vulnerable",
-      "latency_ms": 1110.2,
+      "latency_ms": 1114.16,
       "match": true
     }
   ]

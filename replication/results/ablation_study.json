@@ -8,7 +8,7 @@
     "total_findings": 310,
     "delta_recall_pct": 0.0,
     "delta_findings": 0,
-    "execution_time_sec": 3.1767
+    "execution_time_sec": 3.1277
   },
   {
     "configuration": "Without ESP32PartitionAnalyzer",
@@ -19,7 +19,7 @@
     "total_findings": 300,
     "delta_recall_pct": -10.2,
     "delta_findings": -10,
-    "execution_time_sec": 3.0142
+    "execution_time_sec": 2.9525
   },
   {
     "configuration": "Without SecretsAnalyzer",
@@ -30,7 +30,7 @@
     "total_findings": 246,
     "delta_recall_pct": 0.0,
     "delta_findings": -64,
-    "execution_time_sec": 2.6891
+    "execution_time_sec": 2.666
   },
   {
     "configuration": "Without CryptoAnalyzer",
@@ -41,7 +41,7 @@
     "total_findings": 229,
     "delta_recall_pct": -15.31,
     "delta_findings": -81,
-    "execution_time_sec": 2.4195
+    "execution_time_sec": 2.4054
   },
   {
     "configuration": "Without FlashEncryptionAnalyzer",
@@ -52,7 +52,7 @@
     "total_findings": 299,
     "delta_recall_pct": -6.12,
     "delta_findings": -11,
-    "execution_time_sec": 2.6683
+    "execution_time_sec": 2.6366
   },
   {
     "configuration": "Without SecureBootAnalyzer",
@@ -63,7 +63,7 @@
     "total_findings": 289,
     "delta_recall_pct": -11.22,
     "delta_findings": -21,
-    "execution_time_sec": 3.1643
+    "execution_time_sec": 3.1093
   },
   {
     "configuration": "Without BackdoorAnalyzer",
@@ -74,7 +74,7 @@
     "total_findings": 296,
     "delta_recall_pct": -22.45,
     "delta_findings": -14,
-    "execution_time_sec": 3.125
+    "execution_time_sec": 3.0768
   },
   {
     "configuration": "Without DangerousFunctionAnalyzer",
@@ -85,7 +85,7 @@
     "total_findings": 278,
     "delta_recall_pct": -22.45,
     "delta_findings": -32,
-    "execution_time_sec": 2.2676
+    "execution_time_sec": 2.2524
   },
   {
     "configuration": "Without FingerprintAnalyzer",
@@ -96,7 +96,7 @@
     "total_findings": 310,
     "delta_recall_pct": 0.0,
     "delta_findings": 0,
-    "execution_time_sec": 3.1656
+    "execution_time_sec": 3.1377
   },
   {
     "configuration": "Without InsecureEndpointAnalyzer",
@@ -107,7 +107,7 @@
     "total_findings": 240,
     "delta_recall_pct": 0.0,
     "delta_findings": -70,
-    "execution_time_sec": 2.7064
+    "execution_time_sec": 2.6729
   },
   {
     "configuration": "Without WeakXORAnalyzer",
@@ -118,6 +118,6 @@
     "total_findings": 303,
     "delta_recall_pct": 0.0,
     "delta_findings": -7,
-    "execution_time_sec": 3.1373
+    "execution_time_sec": 3.1287
   }
 ]

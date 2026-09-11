@@ -1,12 +1,12 @@
 configuration,excluded_module,recall_pct,precision_pct,f1_score,total_findings,delta_recall_pct,delta_findings,execution_time_sec
-Full Pipeline (Baseline),None,100.0,75.38,85.96,310,0.0,0,3.1767
-Without ESP32PartitionAnalyzer,ESP32PartitionAnalyzer,89.8,76.52,82.63,300,-10.2,-10,3.0142
-Without SecretsAnalyzer,SecretsAnalyzer,100.0,75.38,85.96,246,0.0,-64,2.6891
-Without CryptoAnalyzer,CryptoAnalyzer,84.69,72.17,77.93,229,-15.31,-81,2.4195
-Without FlashEncryptionAnalyzer,FlashEncryptionAnalyzer,93.88,74.19,82.88,299,-6.12,-11,2.6683
-Without SecureBootAnalyzer,SecureBootAnalyzer,88.78,73.11,80.18,289,-11.22,-21,3.1643
-Without BackdoorAnalyzer,BackdoorAnalyzer,77.55,70.37,73.79,296,-22.45,-14,3.125
-Without DangerousFunctionAnalyzer,DangerousFunctionAnalyzer,77.55,70.37,73.79,278,-22.45,-32,2.2676
-Without FingerprintAnalyzer,FingerprintAnalyzer,100.0,75.38,85.96,310,0.0,0,3.1656
-Without InsecureEndpointAnalyzer,InsecureEndpointAnalyzer,100.0,95.15,97.51,240,0.0,-70,2.7064
-Without WeakXORAnalyzer,WeakXORAnalyzer,100.0,75.38,85.96,303,0.0,-7,3.1373
+Full Pipeline (Baseline),None,100.0,75.38,85.96,310,0.0,0,3.1277
+Without ESP32PartitionAnalyzer,ESP32PartitionAnalyzer,89.8,76.52,82.63,300,-10.2,-10,2.9525
+Without SecretsAnalyzer,SecretsAnalyzer,100.0,75.38,85.96,246,0.0,-64,2.666
+Without CryptoAnalyzer,CryptoAnalyzer,84.69,72.17,77.93,229,-15.31,-81,2.4054
+Without FlashEncryptionAnalyzer,FlashEncryptionAnalyzer,93.88,74.19,82.88,299,-6.12,-11,2.6366
+Without SecureBootAnalyzer,SecureBootAnalyzer,88.78,73.11,80.18,289,-11.22,-21,3.1093
+Without BackdoorAnalyzer,BackdoorAnalyzer,77.55,70.37,73.79,296,-22.45,-14,3.0768
+Without DangerousFunctionAnalyzer,DangerousFunctionAnalyzer,77.55,70.37,73.79,278,-22.45,-32,2.2524
+Without FingerprintAnalyzer,FingerprintAnalyzer,100.0,75.38,85.96,310,0.0,0,3.1377
+Without InsecureEndpointAnalyzer,InsecureEndpointAnalyzer,100.0,95.15,97.51,240,0.0,-70,2.6729
+Without WeakXORAnalyzer,WeakXORAnalyzer,100.0,75.38,85.96,303,0.0,-7,3.1287

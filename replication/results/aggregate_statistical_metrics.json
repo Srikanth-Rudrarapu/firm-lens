@@ -1,21 +1,21 @@
 {
   "latency_seconds": {
     "n": 11,
-    "mean": 0.8233,
-    "std_dev": 0.4574,
-    "median": 0.6866,
-    "min": 0.5078,
-    "max": 2.1348,
-    "ci_95": 0.2703
+    "mean": 0.8176,
+    "std_dev": 0.4609,
+    "median": 0.6804,
+    "min": 0.5069,
+    "max": 2.1449,
+    "ci_95": 0.2724
   },
   "throughput_mb_s": {
     "n": 11,
-    "mean": 3.8964,
-    "std_dev": 1.3372,
-    "median": 4.16,
+    "mean": 3.9327,
+    "std_dev": 1.3601,
+    "median": 4.14,
     "min": 2.58,
-    "max": 6.11,
-    "ci_95": 0.7902
+    "max": 6.16,
+    "ci_95": 0.8038
   },
   "peak_memory_mb": {
     "n": 11,
