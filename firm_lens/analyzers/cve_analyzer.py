@@ -6,7 +6,7 @@ from firm_lens.utils.findings import Finding
 
 class CVEAnalyzer:
     """
-    Industrial-grade Dynamic Threat Intelligence Engine.
+    Dynamic Threat Intelligence Engine.
     Queries an offline-first relational vulnerability database with robust version matching.
     """
     def __init__(self, db_path: str = None):

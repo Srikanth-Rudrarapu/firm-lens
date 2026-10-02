@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "firm-lens"
-version = "1.0.4"
-description = "Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
+version = "1.0.5"
+description = "Automated Static, Hardware-Rooted & Dynamic HIL Security Analysis for Bare-Metal ESP32 (Xtensa & RISC-V) Firmware"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }

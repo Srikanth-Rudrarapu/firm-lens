@@ -76,7 +76,7 @@ class FirmLensCLICommandGroup(click.Group):
     cls=FirmLensCLICommandGroup,
     invoke_without_command=True,
     help="""
-FirmLens — Industrial-Grade Embedded IoT Firmware Security Analysis Engine.
+FirmLens — Automated Static, Hardware-Rooted & Dynamic HIL Security Analysis for Bare-Metal ESP32 (Xtensa & RISC-V) Firmware.
 
 Automates binary partition carving, sliding-window Shannon entropy mapping, 
 symbolic vulnerability tracking, and automated CWE/CVE supply-chain mapping.

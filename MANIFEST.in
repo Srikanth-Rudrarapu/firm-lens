@@ -1,7 +1,22 @@
+include LICENSE
+include README.md
+include CITATION.cff
+include CITATION.bib
+include pyproject.toml
+
 # Include source and data files
 recursive-include firm_lens *.py
 recursive-include firm_lens *.db
 recursive-include firm_lens *.json
+
+# Prune external directories from the source package
+prune tests
+prune paper
+prune replication
+prune experiments
+prune assets
+prune .pytest_cache
+prune venv
 
 # Exclude junk files
 global-exclude .DS_Store

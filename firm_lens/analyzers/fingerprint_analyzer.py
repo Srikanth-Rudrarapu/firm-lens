@@ -3,7 +3,7 @@ from typing import List
 from firm_lens.utils.findings import Finding
 
 class FingerprintAnalyzer:
-    """Industrial-grade SDK & Library Fingerprinting Engine."""
+    """SDK & Library Fingerprinting Engine."""
     def __init__(self):
         self.sdk_patterns = {
             "ESP-IDF": re.compile(rb"esp-idf-v(\d+\.\d+\.\d+)"),

@@ -6,6 +6,7 @@ _____ ___ ____  __  __ _     _____ _   _ ____ ____ _
  |  _|  | ||  _ <| |  | | |___| |___| |\  |___) |
  |_|   |___|_| \_\_|  |_|_____|_____|_| \_|____/ 
                                                  
- [ Industrial-Grade Embedded IoT Firmware Security Analysis Engine ]
+ [ Automated Security Analysis for Bare-Metal ESP32 (Xtensa & RISC-V) ]
+ [ Static, Hardware-Rooted & Dynamic HIL Telemetry ]
 
  """

@@ -3,7 +3,7 @@ from typing import List, Tuple
 
 class StringExtractor:
     """
-    Industrial-grade High-Performance String Carving Engine.
+    High-Performance String Carving Engine.
     Leverages an optimized regular expression execution matrix to extract 
     printable ASCII streams and apply semantic squelching for IoT SDKs.
     """

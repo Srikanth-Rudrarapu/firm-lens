@@ -11,7 +11,7 @@ from pathlib import Path
 
 class ReportGenerator:
     """
-    Industrial-grade Safe Report Orchestrator.
+    Safe Report Orchestrator.
     Protects proprietary analytical thresholds, math calculations, and heuristics
     from client-side exposure via automated output telemetry sanitization.
     """

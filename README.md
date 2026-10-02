@@ -1,11 +1,14 @@
 # FirmLens
 
-**Industrial-Grade Embedded IoT Firmware Security Analysis Engine**
+**Automated Static, Hardware-Rooted & Dynamic HIL Security Analysis for Bare-Metal ESP32 (Xtensa & RISC-V) Firmware**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Python Version](https://img.shields.io/badge/Python-3.10%2B-darkgreen.svg)]()
-[![Platform Support](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blueviolet.svg)]()
-[![Architecture](https://img.shields.io/badge/Architecture-Espressif%20SoCs-orange.svg)]()
+[![PyPI](https://img.shields.io/pypi/v/firm-lens?color=blue&label=PyPI%20Package)](https://pypi.org/project/firm-lens/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22704968.svg)](https://doi.org/10.5281/zenodo.22704968)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python](https://img.shields.io/badge/Python-3.10+-brightgreen.svg)](#)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux%20%7C%20Windows-blueviolet.svg)](#)
+[![Target](https://img.shields.io/badge/Target-Espressif%20SoCs-blue.svg)](#)
+[![Architecture](https://img.shields.io/badge/Architecture-Xtensa%20%7C%20RISC--V-orange.svg)](#)
 
 ## Why FirmLens? The Genesis
 
@@ -78,8 +81,17 @@ FirmLens occupies a distinct niche: **architectural semantic analysis for Espres
 FirmLens requires Python 3.10+ and relies on the Espressif `esptool` for physical hardware interactions.
 
 ### Option 1: Install via PyPI (Stable Release)
-The recommended installation method for production environments.
+The recommended installation method for production environments. 
 
+(For Global isolated CLI Environment)
+```bash
+#Install
+pipx install firm-lens
+
+#Upgrade
+pipx upgrade firm-lens
+```
+Alternatively (Inside an active virtual env)
 ```bash
 #Install
 pip install firm-lens
@@ -167,13 +179,14 @@ Executes live serial or network fuzzing against a connected device to test memor
 firm-lens dynamic -f all
 
 # Network Boundary Fuzzing
-firm-lens dynamic --target-ip 192.168.1.150 -f all
+firm-lens dynamic --target-ip <IP> -f all
 ```
+> **Note:** Replace `<IP>` with the active IPv4 address assigned to the ESP32 Wi-Fi station or access point.
 
 **Output Routing (`-o` flag):**
 * **Default Behavior:** Dynamic audit artifacts are routed separately to `~/Downloads/FirmLens_Reports/Dynamic/` to maintain data isolation from static scans.
 * **Explicit Output:** You may specify a custom directory or exact filename using the `-o` flag:
-  `firm-lens dynamic --target-ip 192.168.1.150 -o /custom/path/my_dynamic_report -f all`
+  `firm-lens dynamic --target-ip <IP> -o /custom/path/my_dynamic_report -f all`
 
 ### 4. Component Discovery
 List all active heuristic software analyzers and hardware target domains currently loaded into the scanner subsystem.
@@ -184,7 +197,7 @@ firm-lens categories
 
 ---
 
-## Enterprise Reporting & Output Formats
+## Reporting & Output Formats
 
 FirmLens provides high-fidelity reporting designed for enterprise security teams and CI/CD pipelines. Modifiers are passed via the `-f` or `--format` flag:
 
@@ -209,8 +222,8 @@ FirmLens provides high-fidelity reporting designed for enterprise security teams
     "schema_version": "1.0.0",
     "scan_metadata": {
         "tool": "FirmLens",
-        "target_asset": "hardware_extracted_flash.bin",
-        "timestamp": "2026-06-22T13:11:39.602468",
+        "target_asset": "damn_vuln.bin",
+        "timestamp": "2026-10-02T19:46:46.014492",
         "telemetry_audit_vectors_enforced": 10,
         "total_security_anomalies_isolated": 12,
         "severity_distribution_scoreboard": {
@@ -233,20 +246,22 @@ FirmLens provides high-fidelity reporting designed for enterprise security teams
             ],
             "is_vulnerability": true,
             "evidence": [
-                "[0xa524] Memory Block -> SSID: 'TestSSID' | PSK: 'TESTPASSWORD123",
-                "[0xc244] Memory Block -> SSID: 'ExampleSSID' | PSK: 'ExamplePassword",
-                "[0xc2d0] Memory Block -> SSID: 'DemoNetwork' | PSK: 'DemoPassword123"
+                "[0xa524] Memory Block -> SSID: 'OfficeNet' | PSK: 'Passw0rd123!",
+                "[0xc244] Memory Block -> SSID: 'OfficeNet' | PSK: 'Passw0rd123!",
+                "[0xc2d0] Memory Block -> SSID: 'HomeNetwork' | PSK: 'SuperSecret123",
+                "[0xeb44] Memory Block -> SSID: 'FirmLens_Target' | PSK: 'firmware123"
             ],
             "offsets": [
-                "0xa524, 0xc244, 0xc2d0"
+                "0xa524 ... 0xeb44 (4 Locations)"
             ],
             "scope": "local",
-            "remediation_blueprint": "Purge raw credential values, private keys, and API tokens from code strings. Migrate secret data into an independent, encrypted NVS partition block or handle configuration handshakes dynamically using runtime encrypted key exchanges. The exposed structures are located at offset(s): 0xa524, 0xc244, 0xc2d0.",
+            "remediation_blueprint": "Purge raw credential values, private keys, and API tokens from code strings. Migrate secret data into an independent, encrypted NVS partition block or handle configuration handshakes dynamically using runtime encrypted key exchanges. The exposed structures are located at offset(s): 0xa524 ... 0xeb44 (4 Locations).",
             "threat_intelligence_telemetry": {
-                "active_exploitation": "active",
-                "epss_score": 0.874,
+                "active_exploitation": "inactive",
+                "epss_score": null,
                 "nist_sp_800_213": "NIST SP 800-213 Data Protection Baseline",
-                "etsi_en_303_645": "ETSI EN 303 645 Compliance Rule 5.1-1 (No Hardcoded Credentials)"
+                "etsi_en_303_645": "ETSI EN 303 645 Compliance Rule 5.1-1 (No Hardcoded Credentials)",
+                "provenance_source": "Firmware Evidence / Local Audit"
             }
         }
     ]
@@ -269,43 +284,52 @@ FirmLens provides high-fidelity reporting designed for enterprise security teams
     "scan_metadata": {
         "tool": "FirmLens",
         "target_asset": "Live ESP32 Target (UART Interconnect)",
-        "timestamp": "2026-06-22T18:08:56.359994",
+        "timestamp": "2026-10-02T19:55:26.287998",
         "telemetry_audit_vectors_enforced": 1,
         "total_security_anomalies_isolated": 1,
         "severity_distribution_scoreboard": {
-            "Critical": 0,
+            "Critical": 1,
             "High": 0,
             "Medium": 0,
             "Low": 0,
-            "Info": 1
+            "Info": 0
         }
     },
     "findings": [
         {
             "compliance_control_domain": "Physical Hardware Device Fuzzing & Interaction",
-            "id": "FL-HITL-001",
-            "severity": "Info",
-            "title": "Hardware-in-the-Loop Fuzzing Boundary Verified",
-            "cwes": [],
-            "is_vulnerability": false,
+            "id": "FL-DYN-01",
+            "severity": "Critical",
+            "title": "Catastrophic Hardware Fault: Catastrophic Memory Corruption (Garbled Panic)",
+            "cwes": [
+                "CWE-120: Buffer Overflow / CWE-134: Format String"
+            ],
+            "is_vulnerability": true,
             "evidence": [
-                "Dynamic Telemetry Validation: Microcontroller unit smoothly processed input queues without raising runtime register exceptions, memory boundary spikes, or kernel loops."
+                "Hardware crash triggered via fuzzing. CPU panicked with 'Catastrophic Memory Corruption (Garbled Panic)'."
             ],
             "offsets": [
-                "System Metric Boundary"
+                "Overwritten / Unrecoverable"
             ],
-            "scope": "global",
-            "remediation_blueprint": "Verification Metric: Continuous testing pipeline milestone achieved. No runtime memory corruption or state engine desynchronization isolated during this execution window.",
+            "scope": "local",
+            "remediation_blueprint": "Implement strict memory bounds checking. Utilize safe string handling (e.g., strncpy, snprintf) and sanitize all network/serial buffer inputs before passing to execution contexts.",
             "threat_intelligence_telemetry": {
                 "active_exploitation": "unsupported",
                 "epss_score": null,
                 "nist_sp_800_213": "NIST SP 800-213 Data Protection Baseline",
-                "etsi_en_303_645": "ETSI EN 303 645 Standard Audit Baseline"
+                "etsi_en_303_645": "ETSI EN 303 645 Standard Audit Baseline",
+                "provenance_source": "Physical Architecture Metric"
             }
         }
     ]
 }
 ```
+
+---
+
+## Ethical Disclosure & Benchmark Targets
+* **Evaluation Targets:** Empirical validation in the accompanying research manuscript was conducted across 11 firmware targets (1.31–8.88 MB), including synthetic bare-metal test images, custom ESP-IDF target binaries, and open-source production images (e.g., Tasmota open-source firmware distribution).
+* **Controlled Environment:** All dynamic Hardware-in-the-Loop (HIL) fuzzing (serial UART and network interfaces) was performed exclusively against isolated, author-owned ESP32 development hardware in a sandbox laboratory environment. No uncoordinated, destructive, or unauthorized testing was conducted against third-party or production systems.
 
 ---
 
@@ -317,21 +341,41 @@ FirmLens follows Semantic Versioning (SemVer).
 - Minor versions introduce new capabilities and analysis modules.
 - Patch versions contain fixes, documentation improvements, and maintenance updates.
 
+---
+
 ## Citation
 
 FirmLens is an open-source firmware security analysis framework. If you use FirmLens in research, publications, technical reports, or security assessments, please cite the software artifact:
 
 ```bibtex
+@misc{rudrarapu_2026_22704969,
+  author       = {Rudrarapu, Srikanth},
+  title        = {FirmLens: Automated Static, Hardware-Rooted, and
+                   Dynamic HIL Vulnerability Analysis for Bare-Metal
+                   ESP32 Firmware
+                  },
+  month        = sep,
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {v1.0},
+  doi          = {10.5281/zenodo.22704969},
+  url          = {https://doi.org/10.5281/zenodo.22704969}
+}
+
 @software{firmlens_software,
-  author    = {Rudrarapu, Srikanth},
-  title     = {FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine},
-  year      = {2026},
-  version   = {1.0.4},
-  url       = {https://github.com/Srikanth-Rudrarapu/firm-lens}
+  author     = {Rudrarapu, Srikanth},
+  title      = {FirmLens: Automated Static, Hardware-Rooted \& Dynamic HIL Security Analysis for Bare-Metal ESP32 (Xtensa \& RISC-V) Firmware},
+  year       = {2026},
+  version    = {1.0.5},
+  publisher  = {Python Package Index (PyPI)},
+  url        = {https://pypi.org/project/firm-lens/},
+  repository = {https://github.com/Srikanth-Rudrarapu/firm-lens}
 }
 ```
 
-> *An empirical evaluation manuscript describing FirmLens is in preparation. For the latest publication status and citation (preprint/DOI, once available), see [CITATION.cff](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.cff) or [CITATION.bib](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.bib), which are kept current independent of software releases.*
+> *The empirical evaluation manuscript describing FirmLens is available as a preprint on Zenodo [https://doi.org/10.5281/zenodo.22704968](https://doi.org/10.5281/zenodo.22704968). Up-to-date citation metadata across formats is maintained in [CITATION.cff](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.cff) and [CITATION.bib](https://github.com/Srikanth-Rudrarapu/firm-lens/blob/main/CITATION.bib).*
+
+---
 
 ## Support the Project
 
@@ -339,9 +383,13 @@ If you found FirmLens useful for your security research or compliance auditing, 
 
 [![GitHub stars](https://img.shields.io/github/stars/Srikanth-Rudrarapu/firm-lens.svg?style=social&label=Stars)](https://github.com/Srikanth-Rudrarapu/firm-lens)
 
+---
+
 ## Disclaimer
 
 FirmLens is engineered strictly for authorized security research, compliance auditing, and defensive engineering. Ensure explicit legal authorization is granted prior to analyzing or interacting with target hardware.  
+
+---
 
 ## License
 

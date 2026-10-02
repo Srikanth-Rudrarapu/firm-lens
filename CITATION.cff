@@ -1,11 +1,28 @@
 cff-version: 1.2.0
-message: "If you use FirmLens in research, publications, technical reports, or security assessments, please cite it using the metadata below."
-title: "FirmLens: Industrial-Grade Embedded IoT Firmware Security Analysis Engine"
+message: "If you use FirmLens or build upon its methodology, please cite both the software and the accompanying research preprint."
+title: "FirmLens: Automated Static, Hardware-Rooted & Dynamic HIL Security Analysis for Bare-Metal ESP32 (Xtensa & RISC-V) Firmware"
 type: software
+version: "1.0.5"
+date-released: "2026-10-03"
+license: MIT
+repository-code: "https://github.com/Srikanth-Rudrarapu/firm-lens"
+url: "https://pypi.org/project/firm-lens/"
 authors:
   - family-names: Rudrarapu
     given-names: Srikanth
-version: 1.0.4
-license: MIT
-repository-code: https://github.com/Srikanth-Rudrarapu/firm-lens
-url: https://github.com/Srikanth-Rudrarapu/firm-lens
+    orcid: "https://orcid.org/0009-0005-6080-6895"
+preferred-citation:
+  type: generic
+  title: "FirmLens: Automated Static, Hardware-Rooted, and Dynamic HIL Vulnerability Analysis for Bare-Metal ESP32 Firmware"
+  authors:
+    - family-names: Rudrarapu
+      given-names: Srikanth
+      orcid: "https://orcid.org/0009-0005-6080-6895"
+  year: 2026
+  month: 9
+  doi: "10.5281/zenodo.22704969"
+  url: "https://doi.org/10.5281/zenodo.22704969"
+  license: "CC-BY-4.0"
+  publisher:
+    name: "Zenodo"
+  notes: "Preprint deposited on Zenodo"
